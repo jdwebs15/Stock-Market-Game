@@ -62,7 +62,7 @@
 
         <div class="footerNote">
           Prices: Use a teacher-approved source (Google Finance, Yahoo Finance, broker app).<br/>
-          This tool posts check-ins to a teacher Google Sheet to verify completion + leaderboard.
+          This tool sends check-ins to a teacher Google Sheet to verify completion + leaderboard.
         </div>
       </div>
     </div>
@@ -83,7 +83,7 @@
       <div class="card" style="grid-column:span 12">
         <h2>Class Leaderboard (Live)</h2>
         <div class="small">
-          Pulls from teacher Google Sheet. If it shows empty, check your internet, class code, or script URL deployment.
+          Pulls from teacher Google Sheet. If it shows empty, check internet + Apps Script deployment.
         </div>
         <div id="leaderboardTable" class="tableWrap"></div>
         <div class="row" style="margin-top:10px">
@@ -160,13 +160,10 @@
 <script>
 (() => {
   /* ===========================
-   CONFIG — SET ONCE
-   =========================== */
-/* ===========================
-   CONFIG — SET ONCE
-   =========================== */
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwF5JnpCNBz66OsnWvOEAi8itSn-ajCmCPJe6X-izO6YKZLe4hsHHwW513T6ocjZd8-gw/exec";
-const CLASS_CODE = "STOCK6WEEK";
+     CONFIG — SET ONCE
+     =========================== */
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzb8y2Lemi4wh35KriEVrdnBLE2Q5BLNdE7Gs-x3tJkOVypKBxYwWLO0Fob3YRYWDMMGQ/exec";
+  const CLASS_CODE = "STOCK6WEEK";
 
   /* ===========================
      SAFE CLONE (no structuredClone)
@@ -229,34 +226,72 @@ const CLASS_CODE = "STOCK6WEEK";
     }
   }
 
+  /* ===========================
+     CORS-SAFE SHEET BRIDGE
+     - POST: sendBeacon / fetch no-cors (fire-and-forget)
+     - GET: JSONP (script tag)
+     =========================== */
   async function postToSheet(payload){
     if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")){
       return { ok:false, error:"SCRIPT_URL not set" };
     }
+
     try{
-      const res = await fetch(SCRIPT_URL, {
+      const body = JSON.stringify(payload);
+
+      if(navigator.sendBeacon){
+        const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
+        const ok = navigator.sendBeacon(SCRIPT_URL, blob);
+        return ok ? { ok:true, note:"beacon-sent" } : { ok:false, error:"sendBeacon failed" };
+      }
+
+      await fetch(SCRIPT_URL, {
         method: "POST",
+        mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
+        body
       });
-      const txt = await res.text();
-      try { return JSON.parse(txt); } catch(e){ return { ok:false, error:"Bad JSON from server", raw:txt }; }
+
+      return { ok:true, note:"no-cors-sent" };
     }catch(e){
-      return { ok:false, error:"Network/Fetch error" };
+      return { ok:false, error:"Network/Beacon error" };
     }
   }
 
-  async function getFromSheet(fn){
-    if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")){
-      return { ok:false, error:"SCRIPT_URL not set" };
-    }
-    try{
-      const url = `${SCRIPT_URL}?fn=${encodeURIComponent(fn)}&classCode=${encodeURIComponent(CLASS_CODE)}&_=${Date.now()}`;
-      const res = await fetch(url, { method:"GET", cache:"no-store" });
-      return await res.json();
-    }catch(e){
-      return { ok:false, error:"Network/Fetch error" };
-    }
+  function getFromSheet(fn){
+    return new Promise((resolve) => {
+      if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")){
+        resolve({ ok:false, error:"SCRIPT_URL not set" });
+        return;
+      }
+      const cb = `__jsonp_cb_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      const url =
+        `${SCRIPT_URL}?fn=${encodeURIComponent(fn)}` +
+        `&classCode=${encodeURIComponent(CLASS_CODE)}` +
+        `&callback=${encodeURIComponent(cb)}` +
+        `&_=${Date.now()}`;
+
+      const script = document.createElement("script");
+      script.src = url;
+      script.async = true;
+
+      const cleanup = () => {
+        try{ delete window[cb]; }catch(_){}
+        if(script && script.parentNode) script.parentNode.removeChild(script);
+      };
+
+      window[cb] = (data) => {
+        cleanup();
+        resolve(data);
+      };
+
+      script.onerror = () => {
+        cleanup();
+        resolve({ ok:false, error:"JSONP load error" });
+      };
+
+      document.body.appendChild(script);
+    });
   }
 
   function renderPortfolioInputs(){
@@ -382,6 +417,16 @@ const CLASS_CODE = "STOCK6WEEK";
     };
   }
 
+  function escapeHtml(s){
+    return (s ?? "")
+      .toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
   function renderPortfolioSummary(){
     const el = $("portfolioSummary");
     const total = getTotalInvested();
@@ -485,45 +530,14 @@ const CLASS_CODE = "STOCK6WEEK";
     el.innerHTML = `<div class="tableWrap"><table>${head}<tbody>${body}</tbody></table></div>`;
   }
 
-  function lockStartAndShowMain(){
-    $("startPanel").style.display = "none";
-    $("mainPanel").style.display = "block";
-
-    $("kpiName").textContent = data.student.name || "—";
-    $("kpiStart").textContent = data.startedAt ? data.startedAt.local : "—";
-    $("kpiInvested").textContent = fmtMoney(getTotalInvested());
-
-    renderPortfolioSummary();
-    renderPriceInputs();
-    renderLog();
-    updateCurrentKPI();
-    refreshLeaderboard();
-  }
-
-  function restartAssignment(){
-    localStorage.removeItem(STORAGE_KEY);
-    data = deepClone(defaultData);
-    location.reload();
-  }
-
-  function escapeHtml(s){
-    return (s ?? "")
-      .toString()
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
   function setBoardStatus(t){ $("boardStatus").textContent = t; }
 
   async function refreshLeaderboard(){
     setBoardStatus("Loading…");
     const res = await getFromSheet("leaderboard");
-    if(!res.ok){
+    if(!res || !res.ok){
       setBoardStatus("Error loading leaderboard.");
-      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. Check SCRIPT URL deployment + class code.</div>`;
+      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. Check Apps Script deployment + class code.</div>`;
       return;
     }
     setBoardStatus(`Updated: ${new Date().toLocaleTimeString()}`);
@@ -559,6 +573,27 @@ const CLASS_CODE = "STOCK6WEEK";
         <tbody>${rows}</tbody>
       </table>
     `;
+  }
+
+  function lockStartAndShowMain(){
+    $("startPanel").style.display = "none";
+    $("mainPanel").style.display = "block";
+
+    $("kpiName").textContent = data.student.name || "—";
+    $("kpiStart").textContent = data.startedAt ? data.startedAt.local : "—";
+    $("kpiInvested").textContent = fmtMoney(getTotalInvested());
+
+    renderPortfolioSummary();
+    renderPriceInputs();
+    renderLog();
+    updateCurrentKPI();
+    refreshLeaderboard();
+  }
+
+  function restartAssignment(){
+    localStorage.removeItem(STORAGE_KEY);
+    data = deepClone(defaultData);
+    location.reload();
   }
 
   async function saveEntry(){
@@ -622,11 +657,11 @@ const CLASS_CODE = "STOCK6WEEK";
 
     if(serverRes.ok){
       msg.className = "msg show good";
-      msg.textContent = `Saved ✅ (${dateISO}) and posted to teacher sheet.`;
+      msg.textContent = `Saved ✅ (${dateISO}). Sent to teacher sheet.`;
       refreshLeaderboard();
     } else {
       msg.className = "msg show warn";
-      msg.textContent = `Saved locally ✅ but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`;
+      msg.textContent = `Saved locally ✅ but could NOT send to teacher sheet. (${serverRes.error || "unknown"})`;
     }
 
     for(const p of (data.portfolio || [])){
@@ -682,6 +717,11 @@ const CLASS_CODE = "STOCK6WEEK";
     tWrap.style.display = "block";
   }
 
+  function csvSafe(s){
+    const x = (s ?? "").toString().replaceAll('"','""');
+    return `"${x}"`;
+  }
+
   function downloadCSV(){
     const tickers = (data.portfolio || []).map(p=>p.ticker);
     const rows = [];
@@ -717,11 +757,6 @@ const CLASS_CODE = "STOCK6WEEK";
     a.click();
     a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href), 800);
-  }
-
-  function csvSafe(s){
-    const x = (s ?? "").toString().replaceAll('"','""');
-    return `"${x}"`;
   }
 
   // Hydrate start form
@@ -762,10 +797,10 @@ const CLASS_CODE = "STOCK6WEEK";
     const msg = $("startMsg");
     if(serverRes.ok){
       msg.className = "msg show good";
-      msg.textContent = "Started ✅ Posted to teacher sheet.";
+      msg.textContent = "Started ✅ Sent to teacher sheet.";
     } else {
       msg.className = "msg show warn";
-      msg.textContent = `Started locally ✅, but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`;
+      msg.textContent = `Started locally ✅, but could NOT send to teacher sheet. (${serverRes.error || "unknown"})`;
     }
 
     lockStartAndShowMain();
