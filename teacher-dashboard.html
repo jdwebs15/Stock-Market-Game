@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Teacher Dashboard — Stock Market Assignment</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="title">
+      <h1>Teacher Dashboard — Stock Market Assignment</h1>
+      <p>Live leaderboard + compliance pulled from Google Sheet via Apps Script.</p>
+    </div>
+    <div class="badge"><span>📊</span><span><strong>Class View</strong></span></div>
+  </div>
+
+  <div class="panel">
+    <div class="grid">
+      <div class="card" style="grid-column:span 12">
+        <h2>Settings</h2>
+        <p class="small">Paste your Apps Script Web App URL and class code.</p>
+
+        <div class="grid">
+          <div class="card" style="grid-column:span 8; padding:0; background:none; border:none; box-shadow:none">
+            <label for="scriptUrl">Apps Script Web App URL</label>
+            <input id="scriptUrl" placeholder="https://script.google.com/macros/s/XXXX/exec">
+          </div>
+          <div class="card" style="grid-column:span 4; padding:0; background:none; border:none; box-shadow:none">
+            <label for="classCode">Class Code</label>
+            <input id="classCode" placeholder="ex: STOCK6WEEK">
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="saveCfgBtn">Save Settings</button>
+          <button class="btn" id="refreshBtn">Refresh Data</button>
+          <span class="small" id="status">—</span>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="grid">
+          <div class="card" style="grid-column:span 12">
+            <h2>Leaderboard</h2>
+            <div id="lb" class="tableWrap"></div>
+          </div>
+
+          <div class="card" style="grid-column:span 12">
+            <h2>Compliance</h2>
+            <div class="small">Goal: 6 total entries. Shows entry count + last update for each student.</div>
+            <div id="comp" class="tableWrap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CFG_KEY = "stock_teacher_cfg_v1";
+  const $ = (id)=>document.getElementById(id);
+
+  function loadCfg(){
+    try{ return JSON.parse(localStorage.getItem(CFG_KEY) || "{}"); }catch(e){ return {}; }
+  }
+  function saveCfg(cfg){
+    localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  }
+
+  function setStatus(t){ $("status").textContent = t; }
+
+  async function getJSON(url){
+    const r = await fetch(url, { method:"GET", cache:"no-store" });
+    return await r.json();
+  }
+
+  function tableFromRows(headers, rows){
+    const thead = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr></thead>`;
+    const tbody = `<tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    return `<table>${thead}${tbody}</table>`;
+  }
+
+  async function refresh(){
+    const scriptUrl = $("scriptUrl").value.trim();
+    const classCode = $("classCode").value.trim();
+    if(!scriptUrl || !classCode){
+      setStatus("Enter Script URL + Class Code.");
+      return;
+    }
+    setStatus("Loading…");
+
+    try{
+      const lb = await getJSON(`${scriptUrl}?fn=leaderboard&classCode=${encodeURIComponent(classCode)}`);
+      const comp = await getJSON(`${scriptUrl}?fn=compliance&classCode=${encodeURIComponent(classCode)}`);
+
+      // leaderboard
+      if(lb && lb.ok){
+        const headers = ["Rank","Student","Period","Entries","Last Date","Value","Gain/Loss"];
+        const rows = lb.data.map((s,i)=>[
+          `#${i+1}`,
+          escapeHtml(s.name),
+          escapeHtml(s.period || ""),
+          String(s.entriesCount || 0),
+          escapeHtml(s.lastEntryDate || "—"),
+          (typeof s.lastValue==="number") ? money(s.lastValue) : "—",
+          (typeof s.gain==="number") ? money(s.gain) : "—"
+        ]);
+        $("lb").innerHTML = tableFromRows(headers, rows);
+      } else {
+        $("lb").innerHTML = `<div class="small">No leaderboard data yet.</div>`;
+      }
+
+      // compliance
+      if(comp && comp.ok){
+        const headers = ["Student","Period","Started","Entries","Last Date","Value","Gain/Loss"];
+        const rows = comp.data.map(s=>[
+          escapeHtml(s.name),
+          escapeHtml(s.period || ""),
+          escapeHtml(s.startedAtLocal || "—"),
+          String(s.entriesCount || 0),
+          escapeHtml(s.lastEntryDate || "—"),
+          (typeof s.lastValue==="number") ? money(s.lastValue) : "—",
+          (typeof s.gain==="number") ? money(s.gain) : "—"
+        ]);
+        $("comp").innerHTML = tableFromRows(headers, rows);
+      } else {
+        $("comp").innerHTML = `<div class="small">No compliance data yet.</div>`;
+      }
+
+      setStatus(`Updated: ${new Date().toLocaleString()}`);
+    }catch(e){
+      setStatus("Error loading data (check URL deployment + class code).");
+    }
+  }
+
+  function money(n){
+    return Number(n).toLocaleString(undefined,{style:"currency",currency:"USD",maximumFractionDigits:2});
+  }
+  function escapeHtml(s){
+    return (s ?? "")
+      .toString()
+      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  }
+
+  $("saveCfgBtn").addEventListener("click", ()=>{
+    const cfg = { scriptUrl: $("scriptUrl").value.trim(), classCode: $("classCode").value.trim() };
+    saveCfg(cfg);
+    setStatus("Saved ✅");
+  });
+  $("refreshBtn").addEventListener("click", refresh);
+
+  const cfg = loadCfg();
+  if(cfg.scriptUrl) $("scriptUrl").value = cfg.scriptUrl;
+  if(cfg.classCode) $("classCode").value = cfg.classCode;
+  if(cfg.scriptUrl && cfg.classCode) refresh();
+})();
+</script>
+</body>
+</html>
