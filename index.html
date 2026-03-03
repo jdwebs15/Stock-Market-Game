@@ -1,1 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Stock Market Assignment Hub</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="title">
+        <h1>Stock Market Assignment Hub</h1>
+        <p>
+          6-week portfolio tracker (5 stocks • $10,000 start • diversify • weekly check-ins).
+          Auto-saves locally AND posts progress to a teacher Google Sheet for monitoring + leaderboard.
+        </p>
+      </div>
+      <div class="badge">
+        <span>✅</span>
+        <span><strong>GitHub Pages Ready</strong></span>
+      </div>
+    </div>
 
+    <div class="grid">
+      <div class="card">
+        <h2>Game 1 — Stock Market Assignment Tracker</h2>
+        <p>
+          Students pick 5 stocks, allocate $10,000 (use ≥ $9,500), write a brief rationale,
+          and enter prices for each check-in. Posts to teacher’s Google Sheet automatically.
+        </p>
+        <div class="row">
+          <a class="btn primary" href="games/stock-market-assignment.html">Launch Tracker</a>
+          <span class="chip">Name required</span>
+          <span class="chip">Time/date stamps</span>
+          <span class="chip">Class-wide leaderboard</span>
+        </div>
+        <div class="hr"></div>
+        <div class="small">
+          Tip: Students should use the same device for best continuity (local auto-save). Even if they swap devices,
+          the Google Sheet still captures check-ins.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Teacher Dashboard</h2>
+        <p>
+          View leaderboard + compliance (entries completed, last update, gain/loss). Uses the same Google Sheet backend.
+        </p>
+        <div class="row">
+          <a class="btn good" href="teacher-dashboard.html">Open Teacher Dashboard</a>
+          <span class="chip">Live class data</span>
+        </div>
+        <div class="hr"></div>
+        <div class="small">
+          Note: Teacher dashboard requires the Apps Script Web App to be deployed and the SCRIPT URL added.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
