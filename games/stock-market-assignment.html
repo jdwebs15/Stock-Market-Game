@@ -42,7 +42,7 @@
 
         <div class="hr"></div>
 
-        <h2>Step 2 — Build Your Portfolio (5 different stocks)</h2>
+        <h2 id="step2">Step 2 — Build Your Portfolio (5 different stocks)</h2>
         <p class="small">
           Enter a ticker, category, dollars invested, and a 1–2 sentence reason for each stock.
           You must invest at least <strong>$9,500</strong> total and use <strong>exactly 5 different tickers</strong>.
@@ -53,8 +53,8 @@
         <div class="hr"></div>
 
         <div class="row">
-          <button class="btn primary" id="startBtn">Start Assignment</button>
-          <button class="btn bad" id="wipeBtn" title="Clears ALL saved data for this assignment on this device.">Hard Reset (Clear All)</button>
+          <button class="btn primary" id="startBtn" type="button">Start Assignment</button>
+          <button class="btn bad" id="wipeBtn" type="button" title="Clears ALL saved data for this assignment on this device.">Hard Reset (Clear All)</button>
           <span class="small" id="savedIndicator"></span>
         </div>
 
@@ -87,7 +87,7 @@
         </div>
         <div id="leaderboardTable" class="tableWrap"></div>
         <div class="row" style="margin-top:10px">
-          <button class="btn small" id="refreshBoardBtn">Refresh Leaderboard</button>
+          <button class="btn small" id="refreshBoardBtn" type="button">Refresh Leaderboard</button>
           <span class="small" id="boardStatus">—</span>
         </div>
       </div>
@@ -115,9 +115,9 @@
         <div id="priceInputs"></div>
 
         <div class="row" style="margin-top:12px">
-          <button class="btn good" id="saveEntryBtn">Save Check-In</button>
-          <button class="btn" id="switchStudentBtn">Switch Student</button>
-          <button class="btn" id="restartBtn">Restart Assignment</button>
+          <button class="btn good" id="saveEntryBtn" type="button">Save Check-In</button>
+          <button class="btn" id="switchStudentBtn" type="button">Switch Student</button>
+          <button class="btn" id="restartBtn" type="button">Restart Assignment</button>
         </div>
 
         <div id="entryMsg" class="msg"></div>
@@ -141,9 +141,9 @@
         <div class="hr"></div>
 
         <div class="row">
-          <button class="btn primary" id="makeTicketBtn">Generate Submit Ticket</button>
-          <button class="btn" id="copyTicketBtn">Copy Ticket Text</button>
-          <button class="btn" id="downloadCsvBtn">Download CSV</button>
+          <button class="btn primary" id="makeTicketBtn" type="button">Generate Submit Ticket</button>
+          <button class="btn" id="copyTicketBtn" type="button">Copy Ticket Text</button>
+          <button class="btn" id="downloadCsvBtn" type="button">Download CSV</button>
         </div>
 
         <div id="ticketWrap" style="margin-top:12px; display:none">
@@ -159,44 +159,50 @@
 
 <script>
 (() => {
-  /* =========================================================
-     CONFIG — YOU SET THESE ONCE
-     ========================================================= */
-  // 1) Paste your Apps Script Web App URL here AFTER deploying:
- https://script.google.com/a/macros/nortonpanthers.org/s/AKfycbzb8y2Lemi4wh35KriEVrdnBLE2Q5BLNdE7Gs-x3tJkOVypKBxYwWLO0Fob3YRYWDMMGQ/exec
-  // 2) Set a class code (must match the one in Apps Script):
+  /* ===========================
+     CONFIG — SET ONCE
+     =========================== */
+  const SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE"; // must end with /exec
   const CLASS_CODE = "STOCK6WEEK";
 
-  /* =========================================================
-     LOCAL STORAGE KEYS
-     ========================================================= */
-  const STORAGE_KEY = "stock_assignment_v2"; // local student save
-  const CFG_KEY = "stock_cfg_v2";            // optional overrides later
+  /* ===========================
+     SAFE CLONE (no structuredClone)
+     =========================== */
+  function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
 
+  const STORAGE_KEY = "stock_assignment_v2";
   const $ = (id) => document.getElementById(id);
   const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { style:"currency", currency:"USD", maximumFractionDigits:2 });
 
-  const nowStamp = () => {
+  function nowStamp(){
     const d = new Date();
     const date = d.toLocaleDateString(undefined, { year:"numeric", month:"2-digit", day:"2-digit" });
     const time = d.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit", second:"2-digit" });
     return { iso: d.toISOString(), local: `${date} ${time}`, date, time };
-  };
-  const todayISODate = () => {
+  }
+  function todayISODate(){
     const d = new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth()+1).padStart(2,"0");
     const dd = String(d.getDate()).padStart(2,"0");
     return `${yyyy}-${mm}-${dd}`;
-  };
-  const studentKeyFrom = (name, period) => `${name}`.trim().toLowerCase() + " | " + `${period}`.trim().toLowerCase();
+  }
+  function studentKeyFrom(name, period){
+    return `${name}`.trim().toLowerCase() + " | " + `${period}`.trim().toLowerCase();
+  }
+
+  const categories = [
+    "Technology / AI", "Finance / Banking", "Healthcare / Pharma", "Energy", "Consumer / Retail",
+    "Industrial", "Transportation", "Entertainment / Media", "Food / Beverage", "Telecom",
+    "Real Estate", "Utilities", "Automotive", "Other"
+  ];
 
   const defaultData = {
     student: { name:"", classPeriod:"", teacher:"" },
     studentKey: "",
-    startedAt: null, // {iso,local,date,time}
-    portfolio: [],   // 5 rows: {ticker, category, dollars, reason}
-    entries: []      // {dateISO, savedAt:{...}, prices:{TICKER: price}, value, gain}
+    startedAt: null,     // {iso,local,date,time}
+    portfolio: [],       // [{ticker, category, dollars, reason}]
+    entries: []          // [{dateISO, savedAt, prices, value, gain}]
   };
 
   let data = load();
@@ -204,11 +210,11 @@
   function load(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return structuredClone(defaultData);
+      if(!raw) return deepClone(defaultData);
       const parsed = JSON.parse(raw);
-      return { ...structuredClone(defaultData), ...parsed };
+      return { ...deepClone(defaultData), ...parsed };
     }catch(e){
-      return structuredClone(defaultData);
+      return deepClone(defaultData);
     }
   }
   function save(){
@@ -220,19 +226,16 @@
     }
   }
 
-  /* =========================================================
-     GOOGLE SHEET BACKEND (Apps Script) — POST + GET
-     ========================================================= */
   async function postToSheet(payload){
-    // We send as text/plain to avoid CORS preflight issues
-    if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")) return { ok:false, error:"SCRIPT_URL not set" };
+    if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")){
+      return { ok:false, error:"SCRIPT_URL not set" };
+    }
     try{
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       });
-      // Apps Script returns JSON text
       const txt = await res.text();
       try { return JSON.parse(txt); } catch(e){ return { ok:false, error:"Bad JSON from server", raw:txt }; }
     }catch(e){
@@ -241,7 +244,9 @@
   }
 
   async function getFromSheet(fn){
-    if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")) return { ok:false, error:"SCRIPT_URL not set" };
+    if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")){
+      return { ok:false, error:"SCRIPT_URL not set" };
+    }
     try{
       const url = `${SCRIPT_URL}?fn=${encodeURIComponent(fn)}&classCode=${encodeURIComponent(CLASS_CODE)}&_=${Date.now()}`;
       const res = await fetch(url, { method:"GET", cache:"no-store" });
@@ -250,15 +255,6 @@
       return { ok:false, error:"Network/Fetch error" };
     }
   }
-
-  /* =========================================================
-     BUILD 5 PORTFOLIO ROWS
-     ========================================================= */
-  const categories = [
-    "Technology / AI", "Finance / Banking", "Healthcare / Pharma", "Energy", "Consumer / Retail",
-    "Industrial", "Transportation", "Entertainment / Media", "Food / Beverage", "Telecom",
-    "Real Estate", "Utilities", "Automotive", "Other"
-  ];
 
   function renderPortfolioInputs(){
     const wrap = $("portfolioInputs");
@@ -297,16 +293,19 @@
       wrap.appendChild(row);
     }
 
-    // hydrate if saved
     if(Array.isArray(data.portfolio) && data.portfolio.length){
       data.portfolio.forEach((p,i)=>{
         if(!$(`t_${i}`)) return;
         $(`t_${i}`).value = p.ticker || "";
         $(`c_${i}`).value = p.category || categories[0];
-        $(`d_${i}`).value = p.dollars ?? "";
+        $(`d_${i}`).value = (p.dollars ?? "");
         $(`r_${i}`).value = p.reason || "";
       });
     }
+  }
+
+  function getTotalInvested(){
+    return (data.portfolio || []).reduce((s,p)=>s+Number(p.dollars||0),0);
   }
 
   function validateStart(){
@@ -329,10 +328,10 @@
 
     const portfolio = [];
     for(let i=0;i<5;i++){
-      const ticker = $(`t_${i}`).value.trim().toUpperCase();
+      const ticker = ($(`t_${i}`).value || "").trim().toUpperCase();
       const category = $(`c_${i}`).value;
       const dollars = Number($(`d_${i}`).value);
-      const reason = $(`r_${i}`).value.trim();
+      const reason = ($(`r_${i}`).value || "").trim();
 
       if(!ticker || !category || !Number.isFinite(dollars) || dollars <= 0 || !reason){
         msg.className = "msg show bad";
@@ -364,7 +363,7 @@
     const cats = new Set(portfolio.map(p=>p.category));
     if(cats.size === 1){
       msg.className = "msg show warn";
-      msg.textContent = "Warning: All 5 stocks are the same category. Directions recommend diversification — allowed, but not recommended.";
+      msg.textContent = "Warning: All 5 stocks are the same category. Diversification is recommended.";
     }else{
       msg.className = "msg show good";
       msg.textContent = "Looks good. Click Start Assignment.";
@@ -374,31 +373,10 @@
       student: {
         name,
         classPeriod: period,
-        teacher: $("teacherName").value.trim()
+        teacher: ($("teacherName").value || "").trim()
       },
-      portfolio,
-      totalInvested: total
+      portfolio
     };
-  }
-
-  function lockStartAndShowMain(){
-    $("startPanel").style.display = "none";
-    $("mainPanel").style.display = "block";
-
-    $("kpiName").textContent = data.student.name || "—";
-    $("kpiStart").textContent = data.startedAt ? data.startedAt.local : "—";
-    $("kpiInvested").textContent = fmtMoney(getTotalInvested());
-
-    renderPortfolioSummary();
-    renderPriceInputs();
-    renderLog();
-    updateCurrentKPI();
-
-    refreshLeaderboard(); // live class view
-  }
-
-  function getTotalInvested(){
-    return (data.portfolio || []).reduce((s,p)=>s+Number(p.dollars||0),0);
   }
 
   function renderPortfolioSummary(){
@@ -433,7 +411,6 @@
     const wrap = $("priceInputs");
     wrap.innerHTML = "";
     const tickers = (data.portfolio || []).map(p=>p.ticker);
-
     tickers.forEach((t)=>{
       const div = document.createElement("div");
       div.innerHTML = `
@@ -442,7 +419,6 @@
       `;
       wrap.appendChild(div);
     });
-
     $("checkinDate").value = todayISODate();
   }
 
@@ -475,7 +451,6 @@
       el.innerHTML = `<div class="small">No entries saved yet. Your first entry becomes your baseline.</div>`;
       return;
     }
-
     const tickers = (data.portfolio || []).map(p=>p.ticker);
 
     const head = `
@@ -507,6 +482,82 @@
     el.innerHTML = `<div class="tableWrap"><table>${head}<tbody>${body}</tbody></table></div>`;
   }
 
+  function lockStartAndShowMain(){
+    $("startPanel").style.display = "none";
+    $("mainPanel").style.display = "block";
+
+    $("kpiName").textContent = data.student.name || "—";
+    $("kpiStart").textContent = data.startedAt ? data.startedAt.local : "—";
+    $("kpiInvested").textContent = fmtMoney(getTotalInvested());
+
+    renderPortfolioSummary();
+    renderPriceInputs();
+    renderLog();
+    updateCurrentKPI();
+    refreshLeaderboard();
+  }
+
+  function restartAssignment(){
+    localStorage.removeItem(STORAGE_KEY);
+    data = deepClone(defaultData);
+    location.reload();
+  }
+
+  function escapeHtml(s){
+    return (s ?? "")
+      .toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function setBoardStatus(t){ $("boardStatus").textContent = t; }
+
+  async function refreshLeaderboard(){
+    setBoardStatus("Loading…");
+    const res = await getFromSheet("leaderboard");
+    if(!res.ok){
+      setBoardStatus("Error loading leaderboard.");
+      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. Check SCRIPT URL deployment + class code.</div>`;
+      return;
+    }
+    setBoardStatus(`Updated: ${new Date().toLocaleTimeString()}`);
+    renderLeaderboardTable(res.data || []);
+  }
+
+  function renderLeaderboardTable(list){
+    const el = $("leaderboardTable");
+    if(!Array.isArray(list) || list.length === 0){
+      el.innerHTML = `<div class="small">No data yet. Once students start and save check-ins, rankings will appear.</div>`;
+      return;
+    }
+    const rows = list.map((s,i)=>`
+      <tr>
+        <td><strong>#${i+1}</strong></td>
+        <td><strong>${escapeHtml(s.name)}</strong></td>
+        <td>${escapeHtml(s.period || "")}</td>
+        <td>${String(s.entriesCount || 0)}</td>
+        <td>${escapeHtml(s.lastEntryDate || "—")}</td>
+        <td><strong>${(typeof s.lastValue==="number") ? fmtMoney(s.lastValue) : "—"}</strong></td>
+        <td>${(typeof s.gain==="number") ? fmtMoney(s.gain) : "—"}</td>
+      </tr>
+    `).join("");
+
+    el.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Student</th><th>Period</th><th>Entries</th>
+            <th>Last Date</th><th>Value</th><th>Gain/Loss</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
   async function saveEntry(){
     const msg = $("entryMsg");
     msg.className = "msg show warn";
@@ -533,7 +584,7 @@
 
     if(data.entries.findIndex(e => e.dateISO === dateISO) !== -1){
       msg.className = "msg show bad";
-      msg.textContent = "You already saved an entry for this date. Pick a different date or Restart to redo.";
+      msg.textContent = "You already saved an entry for this date.";
       return;
     }
 
@@ -553,7 +604,6 @@
     data.entries.sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
     save();
 
-    // POST ENTRY to Google Sheet
     const payload = {
       classCode: CLASS_CODE,
       type: "ENTRY",
@@ -564,18 +614,18 @@
       entry: { dateISO, savedAt, prices, value, gain, entriesCount: data.entries.length },
       meta: { userAgent: navigator.userAgent }
     };
+
     const serverRes = await postToSheet(payload);
 
     if(serverRes.ok){
       msg.className = "msg show good";
-      msg.textContent = `Saved ✅ (${dateISO}) and posted to teacher sheet. Now generate your Submit Ticket.`;
+      msg.textContent = `Saved ✅ (${dateISO}) and posted to teacher sheet.`;
       refreshLeaderboard();
     } else {
       msg.className = "msg show warn";
-      msg.textContent = `Saved locally ✅, but could NOT post to teacher sheet. Try again later. (${serverRes.error || "unknown"})`;
+      msg.textContent = `Saved locally ✅ but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`;
     }
 
-    // clear price boxes
     for(const p of (data.portfolio || [])){
       $(`p_${p.ticker}`).value = "";
     }
@@ -670,76 +720,15 @@
     const x = (s ?? "").toString().replaceAll('"','""');
     return `"${x}"`;
   }
-  function escapeHtml(s){
-    return (s ?? "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
 
-  function restartAssignment(){
-    localStorage.removeItem(STORAGE_KEY);
-    data = structuredClone(defaultData);
-    location.reload();
-  }
-
-  function setBoardStatus(t){ $("boardStatus").textContent = t; }
-
-  async function refreshLeaderboard(){
-    setBoardStatus("Loading…");
-    const res = await getFromSheet("leaderboard");
-    if(!res.ok){
-      setBoardStatus("Error loading leaderboard.");
-      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. Check SCRIPT URL deployment + class code.</div>`;
-      return;
-    }
-    setBoardStatus(`Updated: ${new Date().toLocaleTimeString()}`);
-    renderLeaderboardTable(res.data || []);
-  }
-
-  function renderLeaderboardTable(list){
-    const el = $("leaderboardTable");
-    if(!Array.isArray(list) || list.length === 0){
-      el.innerHTML = `<div class="small">No data yet. Once students start and save check-ins, rankings will appear.</div>`;
-      return;
-    }
-    const rows = list.map((s,i)=>`
-      <tr>
-        <td><strong>#${i+1}</strong></td>
-        <td><strong>${escapeHtml(s.name)}</strong></td>
-        <td>${escapeHtml(s.period || "")}</td>
-        <td>${String(s.entriesCount || 0)}</td>
-        <td>${escapeHtml(s.lastEntryDate || "—")}</td>
-        <td><strong>${(typeof s.lastValue==="number") ? fmtMoney(s.lastValue) : "—"}</strong></td>
-        <td>${(typeof s.gain==="number") ? fmtMoney(s.gain) : "—"}</td>
-      </tr>
-    `).join("");
-
-    el.innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>Rank</th><th>Student</th><th>Period</th><th>Entries</th>
-            <th>Last Date</th><th>Value</th><th>Gain/Loss</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
-  }
-
-  /* =========================================================
-     HYDRATE + BOOT
-     ========================================================= */
+  // Hydrate start form
   $("studentName").value = data.student.name || "";
   $("classPeriod").value = data.student.classPeriod || "";
   $("teacherName").value = data.student.teacher || "";
 
   renderPortfolioInputs();
 
-  // if already started, show main
+  // Boot to main if already started
   if(data.startedAt && Array.isArray(data.portfolio) && data.portfolio.length === 5){
     lockStartAndShowMain();
   }
@@ -748,16 +737,13 @@
     const v = validateStart();
     if(!v) return;
 
-    if(!data.startedAt){
-      data.startedAt = nowStamp();
-    }
+    if(!data.startedAt) data.startedAt = nowStamp();
 
     data.student = v.student;
     data.studentKey = studentKeyFrom(v.student.name, v.student.classPeriod);
     data.portfolio = v.portfolio;
     save();
 
-    // POST START to Google Sheet
     const payload = {
       classCode: CLASS_CODE,
       type: "START",
@@ -768,14 +754,13 @@
       totalInvested: getTotalInvested(),
       meta: { userAgent: navigator.userAgent }
     };
-    const serverRes = await postToSheet(payload);
 
-    // Even if it fails, student can continue locally
+    const serverRes = await postToSheet(payload);
     const msg = $("startMsg");
     if(serverRes.ok){
       msg.className = "msg show good";
       msg.textContent = "Started ✅ Posted to teacher sheet.";
-    }else{
+    } else {
       msg.className = "msg show warn";
       msg.textContent = `Started locally ✅, but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`;
     }
@@ -789,7 +774,6 @@
   });
 
   $("saveEntryBtn").addEventListener("click", saveEntry);
-
   $("makeTicketBtn").addEventListener("click", buildTicket);
 
   $("copyTicketBtn").addEventListener("click", async () => {
