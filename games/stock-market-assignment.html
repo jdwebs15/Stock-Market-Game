@@ -5,18 +5,26 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Stock Market Assignment — 6 Week Tracker</title>
   <link rel="stylesheet" href="../styles.css"/>
+  <style>
+    .msg{display:none;padding:10px;border-radius:12px;margin-top:10px}
+    .msg.show{display:block}
+    .msg.good{background:rgba(43,213,118,.12);border:1px solid rgba(43,213,118,.25)}
+    .msg.bad{background:rgba(255,92,122,.12);border:1px solid rgba(255,92,122,.25)}
+    .msg.warn{background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.25)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}
+    .tableWrap{overflow:auto;border:1px solid rgba(255,255,255,.10);border-radius:14px}
+    .ticket{white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace}
+  </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <div class="title">
       <h1>Stock Market Assignment — 6 Week Tracker</h1>
-      <p>
-        Choose 5 stocks • Invest $10,000 total • Use at least $9,500 • Diversify categories •
-        Enter prices each check-in • Teacher can view progress + leaderboard.
-      </p>
+      <p>Choose 5 stocks • Invest $10,000 total • Use at least $9,500 • Diversify • Weekly check-ins • Leaderboard + compliance.</p>
     </div>
-    <div class="badge"><span>📈</span><span><strong>Auto-Saves + Cloud Restore</strong></span></div>
+    <div class="badge"><span>📈</span><span><strong>Chromebook Ready</strong></span></div>
   </div>
 
   <!-- START PANEL -->
@@ -28,30 +36,23 @@
         <div class="grid">
           <div class="card" style="grid-column:span 4">
             <label for="studentName">Student Name (required)</label>
-            <input id="studentName" placeholder="First Last" autocomplete="name"/>
+            <input id="studentName" placeholder="First Last"/>
           </div>
           <div class="card" style="grid-column:span 4">
             <label for="classPeriod">Class / Period (required)</label>
-            <input id="classPeriod" placeholder="Period 3" autocomplete="off"/>
+            <input id="classPeriod" placeholder="Period 3"/>
           </div>
           <div class="card" style="grid-column:span 4">
             <label for="teacherName">Teacher (optional)</label>
-            <input id="teacherName" placeholder="Mr./Ms. ____" autocomplete="off"/>
+            <input id="teacherName" placeholder="Mr. Weber"/>
           </div>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <button class="btn" id="restoreBtn" type="button" title="Restores your portfolio + entries from the teacher sheet if you used a different device.">
-            Restore From Teacher Sheet
-          </button>
-          <span class="small" id="restoreStatus">—</span>
         </div>
 
         <div class="hr"></div>
 
-        <h2 id="step2">Step 2 — Build Your Portfolio (5 different stocks)</h2>
+        <h2>Step 2 — Build Your Portfolio (5 different stocks)</h2>
         <p class="small">
-          Enter a ticker, category, dollars invested, and a 1–2 sentence reason for each stock.
+          Enter ticker, category, dollars invested, and a 1–2 sentence reason for each stock.
           You must invest at least <strong>$9,500</strong> total and use <strong>exactly 5 different tickers</strong>.
         </p>
 
@@ -61,15 +62,14 @@
 
         <div class="row">
           <button class="btn primary" id="startBtn" type="button">Start Assignment</button>
-          <button class="btn bad" id="wipeBtn" type="button" title="Clears ALL saved data for this assignment on this device.">Hard Reset (Clear All)</button>
+          <button class="btn bad" id="wipeBtn" type="button">Hard Reset (Clear All)</button>
           <span class="small" id="savedIndicator"></span>
         </div>
 
         <div id="startMsg" class="msg"></div>
 
         <div class="footerNote">
-          Prices: Use a teacher-approved source (Google Finance, Yahoo Finance, broker app).<br/>
-          This tool posts check-ins to a teacher Google Sheet to verify completion + leaderboard.
+          This tool posts check-ins to your teacher sheet. If a Chromebook forgets local storage, we restore from the sheet automatically.
         </div>
       </div>
     </div>
@@ -89,12 +89,9 @@
     <div class="grid">
       <div class="card" style="grid-column:span 12">
         <h2>Class Leaderboard (Live)</h2>
-        <div class="small">
-          Pulls from teacher Google Sheet. If it shows empty, check SCRIPT URL deployment and class code.
-        </div>
         <div id="leaderboardTable" class="tableWrap"></div>
         <div class="row" style="margin-top:10px">
-          <button class="btn small" id="refreshBoardBtn" type="button">Refresh Leaderboard</button>
+          <button class="btn small" id="refreshBoardBtn" type="button">Refresh</button>
           <span class="small" id="boardStatus">—</span>
         </div>
       </div>
@@ -106,15 +103,11 @@
       <div class="card" style="grid-column:span 7">
         <h2>Portfolio (Locked)</h2>
         <div id="portfolioSummary"></div>
-        <div class="small">If you made a mistake, use Restart and re-enter from Step 1.</div>
+        <div class="small">If you made a mistake, use Restart and re-enter Step 1–2.</div>
       </div>
 
       <div class="card" style="grid-column:span 5">
         <h2>Check-In Entry</h2>
-        <p class="small">
-          Enter the <strong>current price</strong> for each stock for today’s check-in.
-          This creates a dated entry and updates totals.
-        </p>
 
         <label for="checkinDate">Check-In Date</label>
         <input id="checkinDate" type="date"/>
@@ -129,9 +122,7 @@
 
         <div id="entryMsg" class="msg"></div>
 
-        <div class="footerNote">
-          Requirement reminder: Full credit as long as you have <strong>6 total entries</strong> by the end.
-        </div>
+        <div class="footerNote">Requirement: Full credit with <strong>6 total entries</strong> by the end.</div>
       </div>
     </div>
 
@@ -139,10 +130,7 @@
 
     <div class="grid">
       <div class="card" style="grid-column:span 12">
-        <h2>Entry Log (Auto-Calculated)</h2>
-        <div class="small">
-          Each entry stores: date, time, prices, portfolio value, gain/loss.
-        </div>
+        <h2>Entry Log</h2>
         <div id="logTable"></div>
 
         <div class="hr"></div>
@@ -150,14 +138,11 @@
         <div class="row">
           <button class="btn primary" id="makeTicketBtn" type="button">Generate Submit Ticket</button>
           <button class="btn" id="copyTicketBtn" type="button">Copy Ticket Text</button>
-          <button class="btn" id="downloadCsvBtn" type="button">Download CSV</button>
         </div>
 
         <div id="ticketWrap" style="margin-top:12px; display:none">
           <div class="ticket" id="ticketBox"></div>
-          <div class="footerNote">
-            Turn-in method: Screenshot this ticket OR paste copied ticket text into Google Classroom.
-          </div>
+          <div class="footerNote">Turn in by screenshot OR paste copied text.</div>
         </div>
       </div>
     </div>
@@ -169,16 +154,49 @@
   /* ===========================
      CONFIG — SET ONCE
      =========================== */
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzPPC7wRHV9S1Zep6urS-t5DleExHikKExHX7n9lHuksZIQNfr_aaqL3Y3eUSfD8ffi/exec";
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzb8y2Lemi4wh35KriEVrdnBLE2Q5BLNdE7Gs-x3tJkOVypKBxYwWLO0Fob3YRYWDMMGQ/exec";
   const CLASS_CODE = "STOCK6WEEK";
 
   /* ===========================
-     UTIL
+     JSONP (NO CORS) — GET READ/WRITE
      =========================== */
-  function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
-  const STORAGE_KEY = "stock_assignment_v3_jsonp";
+  function jsonp(fn, params = {}){
+    return new Promise((resolve) => {
+      const cbName = "cb_" + Math.random().toString(36).slice(2);
+      const q = new URLSearchParams({
+        fn,
+        classCode: CLASS_CODE,
+        callback: cbName,
+        _: Date.now(),
+        ...params
+      });
+
+      window[cbName] = (data) => {
+        try { resolve(data); }
+        finally {
+          delete window[cbName];
+          script.remove();
+        }
+      };
+
+      const script = document.createElement("script");
+      script.src = `${SCRIPT_URL}?${q.toString()}`;
+      script.onerror = () => {
+        resolve({ ok:false, error:"JSONP load error" });
+        try { delete window[cbName]; } catch(e){}
+        script.remove();
+      };
+      document.body.appendChild(script);
+    });
+  }
+
+  /* ===========================
+     STORAGE + HELPERS
+     =========================== */
+  const STORAGE_KEY = "stock_assignment_v3";
   const $ = (id) => document.getElementById(id);
   const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { style:"currency", currency:"USD", maximumFractionDigits:2 });
+  function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
 
   function nowStamp(){
     const d = new Date();
@@ -197,8 +215,7 @@
     return `${name}`.trim().toLowerCase() + " | " + `${period}`.trim().toLowerCase();
   }
   function escapeHtml(s){
-    return (s ?? "")
-      .toString()
+    return (s ?? "").toString()
       .replaceAll("&","&amp;")
       .replaceAll("<","&lt;")
       .replaceAll(">","&gt;")
@@ -206,51 +223,6 @@
       .replaceAll("'","&#039;");
   }
 
-  /* ===========================
-     JSONP (NO CORS)
-     =========================== */
-  function jsonp(fn, params = {}){
-    return new Promise((resolve) => {
-      if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_")){
-        resolve({ ok:false, error:"SCRIPT_URL not set" });
-        return;
-      }
-      const cbName = "cb_" + Math.random().toString(36).slice(2);
-      const q = new URLSearchParams({
-        fn,
-        classCode: CLASS_CODE,
-        callback: cbName,
-        _: Date.now(),
-        ...params
-      });
-
-      window[cbName] = (data) => {
-        try { resolve(data); }
-        finally {
-          try { delete window[cbName]; } catch(e){}
-          script.remove();
-        }
-      };
-
-      const script = document.createElement("script");
-      script.src = `${SCRIPT_URL}?${q.toString()}`;
-      script.onerror = () => {
-        resolve({ ok:false, error:"JSONP load error" });
-        try { delete window[cbName]; } catch(e){}
-        script.remove();
-      };
-      document.body.appendChild(script);
-    });
-  }
-
-  async function pingScript(){
-    const r = await jsonp("ping");
-    return !!(r && r.ok);
-  }
-
-  /* ===========================
-     DATA MODEL
-     =========================== */
   const categories = [
     "Technology / AI", "Finance / Banking", "Healthcare / Pharma", "Energy", "Consumer / Retail",
     "Industrial", "Transportation", "Entertainment / Media", "Food / Beverage", "Telecom",
@@ -260,9 +232,9 @@
   const defaultData = {
     student: { name:"", classPeriod:"", teacher:"" },
     studentKey: "",
-    startedAt: null,     // {iso,local,date,time}
-    portfolio: [],       // [{ticker, category, dollars, reason}]
-    entries: []          // [{dateISO, savedAt, prices, value, gain}]
+    startedAt: null,
+    portfolio: [],
+    entries: []
   };
 
   let data = load();
@@ -273,13 +245,10 @@
       if(!raw) return deepClone(defaultData);
       const parsed = JSON.parse(raw);
       return { ...deepClone(defaultData), ...parsed };
-    }catch(e){
-      return deepClone(defaultData);
-    }
+    }catch(e){ return deepClone(defaultData); }
   }
-
   function save(){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
     const s = $("savedIndicator");
     if(s){
       s.textContent = "Saved ✅";
@@ -287,33 +256,35 @@
     }
   }
 
-  function getTotalInvested(){
-    return (data.portfolio || []).reduce((s,p)=>s+Number(p.dollars||0),0);
-  }
-
   /* ===========================
-     POST EVENTS TO SHEET (via JSONP GET)
+     RESTORE FROM SHEET (Chromebook-safe)
      =========================== */
-  async function postEvent(type, entryObj){
-    // type: START or ENTRY
-    const payload = {
-      classCode: CLASS_CODE,
-      type,
-      studentKey: data.studentKey,
-      name: data.student.name,
-      period: data.student.classPeriod,
-      teacher: data.student.teacher || "",
-      startedAtISO: data.startedAt?.iso || "",
-      totalInvested: String(getTotalInvested() || ""),
-      portfolioJSON: JSON.stringify(data.portfolio || []),
-      entriesCount: String(data.entries.length || 0),
-      entryJSON: entryObj ? JSON.stringify(entryObj) : ""
-    };
-    return await jsonp("log", payload);
+  async function restoreFromSheetIfPossible(){
+    const name = ($("studentName").value || "").trim();
+    const period = ($("classPeriod").value || "").trim();
+    if(!name || !period) return;
+
+    const studentKey = studentKeyFrom(name, period);
+    const res = await jsonp("student", { studentKey });
+
+    if(res && res.ok && res.found){
+      data.student = { name, classPeriod: period, teacher: ($("teacherName").value||"").trim() };
+      data.studentKey = studentKey;
+      data.startedAt = res.startedAt || null;
+      data.portfolio = Array.isArray(res.portfolio) ? res.portfolio : [];
+      data.entries = Array.isArray(res.entries) ? res.entries : [];
+      save();
+
+      const msg = $("startMsg");
+      msg.className = "msg show good";
+      msg.textContent = "Restored from teacher sheet ✅ You can continue without re-entering everything.";
+      // If restored and portfolio exists, jump to main
+      if(data.startedAt && data.portfolio.length === 5) lockStartAndShowMain();
+    }
   }
 
   /* ===========================
-     RENDER: START (5 STOCK INPUTS)
+     UI RENDER
      =========================== */
   function renderPortfolioInputs(){
     const wrap = $("portfolioInputs");
@@ -352,7 +323,6 @@
       wrap.appendChild(row);
     }
 
-    // re-hydrate if we already have portfolio in local storage
     if(Array.isArray(data.portfolio) && data.portfolio.length){
       data.portfolio.forEach((p,i)=>{
         if(!$(`t_${i}`)) return;
@@ -362,6 +332,10 @@
         $(`r_${i}`).value = p.reason || "";
       });
     }
+  }
+
+  function getTotalInvested(){
+    return (data.portfolio || []).reduce((s,p)=>s+Number(p.dollars||0),0);
   }
 
   function validateStart(){
@@ -378,7 +352,7 @@
     }
     if(!period){
       msg.className = "msg show bad";
-      msg.textContent = "Class/Period is required to start (prevents duplicate names).";
+      msg.textContent = "Class/Period is required to start.";
       return null;
     }
 
@@ -388,7 +362,6 @@
       const category = $(`c_${i}`).value;
       const dollars = Number($(`d_${i}`).value);
       const reason = ($(`r_${i}`).value || "").trim();
-
       if(!ticker || !category || !Number.isFinite(dollars) || dollars <= 0 || !reason){
         msg.className = "msg show bad";
         msg.textContent = "All 5 stocks must have: ticker, category, dollars invested (>0), and a brief reason.";
@@ -397,17 +370,16 @@
       portfolio.push({ ticker, category, dollars, reason });
     }
 
-    const tickers = portfolio.map(p=>p.ticker);
-    if(new Set(tickers).size !== 5){
+    if(new Set(portfolio.map(p=>p.ticker)).size !== 5){
       msg.className = "msg show bad";
-      msg.textContent = "You must choose 5 DIFFERENT stocks (no duplicate tickers).";
+      msg.textContent = "You must choose 5 DIFFERENT tickers (no duplicates).";
       return null;
     }
 
     const total = portfolio.reduce((s,p)=>s+p.dollars,0);
     if(total > 10000.0001){
       msg.className = "msg show bad";
-      msg.textContent = `You invested ${fmtMoney(total)}. You only have $10,000. Reduce your total.`;
+      msg.textContent = `You invested ${fmtMoney(total)}. You only have $10,000.`;
       return null;
     }
     if(total < 9500){
@@ -416,34 +388,20 @@
       return null;
     }
 
-    const cats = new Set(portfolio.map(p=>p.category));
-    if(cats.size === 1){
-      msg.className = "msg show warn";
-      msg.textContent = "Warning: All 5 stocks are the same category. Diversification is recommended.";
-    }else{
-      msg.className = "msg show good";
-      msg.textContent = "Looks good. Click Start Assignment.";
-    }
-
+    msg.className = "msg show good";
+    msg.textContent = "Looks good. Click Start Assignment.";
     return {
-      student: {
-        name,
-        classPeriod: period,
-        teacher: ($("teacherName").value || "").trim()
-      },
+      student: { name, classPeriod: period, teacher: ($("teacherName").value||"").trim() },
       portfolio
     };
   }
 
-  /* ===========================
-     MAIN PANEL RENDER
-     =========================== */
   function renderPortfolioSummary(){
     const el = $("portfolioSummary");
     const total = getTotalInvested();
     const rows = (data.portfolio || []).map(p => `
       <tr>
-        <td><strong>${p.ticker}</strong><div class="small">${p.category}</div></td>
+        <td><strong>${p.ticker}</strong><div class="small">${escapeHtml(p.category)}</div></td>
         <td>${fmtMoney(p.dollars)}</td>
         <td class="small">${escapeHtml(p.reason)}</td>
       </tr>
@@ -454,13 +412,7 @@
         <table>
           <thead><tr><th>Stock</th><th>Invested</th><th>Reason</th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot>
-            <tr>
-              <td><strong>Total</strong></td>
-              <td><strong>${fmtMoney(total)}</strong></td>
-              <td></td>
-            </tr>
-          </tfoot>
+          <tfoot><tr><td><strong>Total</strong></td><td><strong>${fmtMoney(total)}</strong></td><td></td></tr></tfoot>
         </table>
       </div>
     `;
@@ -469,8 +421,8 @@
   function renderPriceInputs(){
     const wrap = $("priceInputs");
     wrap.innerHTML = "";
-    const tickers = (data.portfolio || []).map(p=>p.ticker);
-    tickers.forEach((t)=>{
+    (data.portfolio || []).forEach(p=>{
+      const t = p.ticker;
       const div = document.createElement("div");
       div.innerHTML = `
         <label>${t} — Current Price (USD)</label>
@@ -483,11 +435,10 @@
 
   function computeValueFromPrices(prices){
     const base = data.entries[0]?.prices;
-    const port = data.portfolio || [];
     if(!base) return { value: null, gain: null };
 
     let value = 0;
-    for(const p of port){
+    for(const p of (data.portfolio || [])){
       const t = p.ticker;
       const basePrice = Number(base[t]);
       const curPrice = Number(prices[t]);
@@ -495,13 +446,7 @@
       value += Number(p.dollars) * (curPrice / basePrice);
     }
     const invested = getTotalInvested();
-    const gain = value - invested;
-    return { value, gain };
-  }
-
-  function updateCurrentKPI(){
-    const last = data.entries.length ? data.entries[data.entries.length-1] : null;
-    $("kpiCurrent").textContent = (last && last.value!=null) ? fmtMoney(last.value) : "—";
+    return { value, gain: value - invested };
   }
 
   function renderLog(){
@@ -515,11 +460,9 @@
     const head = `
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Saved Time</th>
+          <th>Date</th><th>Saved Time</th>
           ${tickers.map(t=>`<th>${t}</th>`).join("")}
-          <th>Portfolio Value</th>
-          <th>Gain/Loss</th>
+          <th>Portfolio Value</th><th>Gain/Loss</th>
         </tr>
       </thead>
     `;
@@ -530,7 +473,7 @@
       return `
         <tr>
           <td><strong>${e.dateISO}</strong></td>
-          <td class="small">${e.savedAt.local}</td>
+          <td class="small">${e.savedAt?.local || ""}</td>
           ${tickers.map(t=>`<td>${Number(e.prices[t]).toFixed(2)}</td>`).join("")}
           <td><strong>${valueStr}</strong></td>
           <td>${gainStr}</td>
@@ -541,49 +484,9 @@
     el.innerHTML = `<div class="tableWrap"><table>${head}<tbody>${body}</tbody></table></div>`;
   }
 
-  function setBoardStatus(t){ $("boardStatus").textContent = t; }
-
-  async function refreshLeaderboard(){
-    setBoardStatus("Loading…");
-    const res = await jsonp("leaderboard");
-    if(!res.ok){
-      setBoardStatus("Error loading leaderboard.");
-      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. Check Apps Script Web App deployment + SCRIPT_URL.</div>`;
-      return;
-    }
-    setBoardStatus(`Updated: ${new Date().toLocaleTimeString()}`);
-    renderLeaderboardTable(res.data || []);
-  }
-
-  function renderLeaderboardTable(list){
-    const el = $("leaderboardTable");
-    if(!Array.isArray(list) || list.length === 0){
-      el.innerHTML = `<div class="small">No data yet. Once students start and save check-ins, rankings will appear.</div>`;
-      return;
-    }
-    const rows = list.map((s,i)=>`
-      <tr>
-        <td><strong>#${i+1}</strong></td>
-        <td><strong>${escapeHtml(s.name)}</strong></td>
-        <td>${escapeHtml(s.period || "")}</td>
-        <td>${String(s.entriesCount || 0)}</td>
-        <td>${escapeHtml(s.lastEntryDate || "—")}</td>
-        <td><strong>${(typeof s.lastValue==="number") ? fmtMoney(s.lastValue) : "—"}</strong></td>
-        <td>${(typeof s.gain==="number") ? fmtMoney(s.gain) : "—"}</td>
-      </tr>
-    `).join("");
-
-    el.innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>Rank</th><th>Student</th><th>Period</th><th>Entries</th>
-            <th>Last Date</th><th>Value</th><th>Gain/Loss</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
+  function updateCurrentKPI(){
+    const last = data.entries.length ? data.entries[data.entries.length-1] : null;
+    $("kpiCurrent").textContent = (last && last.value!=null) ? fmtMoney(last.value) : "—";
   }
 
   function lockStartAndShowMain(){
@@ -602,13 +505,58 @@
   }
 
   function restartAssignment(){
-    localStorage.removeItem(STORAGE_KEY);
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
     data = deepClone(defaultData);
     location.reload();
   }
 
   /* ===========================
-     SAVE ENTRY
+     LEADERBOARD
+     =========================== */
+  function setBoardStatus(t){ $("boardStatus").textContent = t; }
+
+  async function refreshLeaderboard(){
+    setBoardStatus("Loading…");
+    const res = await jsonp("leaderboard");
+    if(!res.ok){
+      setBoardStatus("Error loading leaderboard.");
+      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. (${escapeHtml(res.error||"")})</div>`;
+      return;
+    }
+    setBoardStatus(`Updated: ${new Date().toLocaleTimeString()}`);
+    renderLeaderboardTable(res.data || []);
+  }
+
+  function renderLeaderboardTable(list){
+    const el = $("leaderboardTable");
+    if(!Array.isArray(list) || list.length === 0){
+      el.innerHTML = `<div class="small">No data yet.</div>`;
+      return;
+    }
+    const rows = list.map((s,i)=>`
+      <tr>
+        <td><strong>#${i+1}</strong></td>
+        <td><strong>${escapeHtml(s.name)}</strong></td>
+        <td>${escapeHtml(s.period || "")}</td>
+        <td>${String(s.entriesCount || 0)}</td>
+        <td>${escapeHtml(s.lastEntryDate || "—")}</td>
+        <td><strong>${(typeof s.lastValue==="number") ? fmtMoney(s.lastValue) : "—"}</strong></td>
+        <td>${(typeof s.gain==="number") ? fmtMoney(s.gain) : "—"}</td>
+      </tr>
+    `).join("");
+
+    el.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Rank</th><th>Student</th><th>Period</th><th>Entries</th><th>Last Date</th><th>Value</th><th>Gain/Loss</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  /* ===========================
+     SAVE ENTRY (JSONP WRITE)
      =========================== */
   async function saveEntry(){
     const msg = $("entryMsg");
@@ -652,14 +600,23 @@
       gain = calc.gain;
     }
 
-    const entryObj = { dateISO, savedAt, prices, value, gain };
-
-    data.entries.push(entryObj);
+    data.entries.push({ dateISO, savedAt, prices, value, gain });
     data.entries.sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
     save();
 
-    // POST to teacher sheet via JSONP
-    const serverRes = await postEvent("ENTRY", entryObj);
+    // JSONP write to sheet
+    const payload = {
+      classCode: CLASS_CODE,
+      type: "ENTRY",
+      studentKey: data.studentKey,
+      student: data.student,
+      startedAt: data.startedAt,
+      portfolio: data.portfolio,
+      totalInvested: getTotalInvested(),
+      entry: { dateISO, savedAt, prices, value, gain, entriesCount: data.entries.length }
+    };
+
+    const serverRes = await jsonp("log", { payload: JSON.stringify(payload) });
 
     if(serverRes.ok){
       msg.className = "msg show good";
@@ -667,7 +624,7 @@
       refreshLeaderboard();
     } else {
       msg.className = "msg show warn";
-      msg.textContent = `Saved locally ✅ but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`;
+      msg.textContent = `Saved locally ✅ but could NOT post. (${serverRes.error || "unknown"})`;
     }
 
     for(const p of (data.portfolio || [])){
@@ -679,7 +636,7 @@
   }
 
   /* ===========================
-     SUBMIT TICKET + CSV
+     TICKET
      =========================== */
   function buildTicket(){
     const tWrap = $("ticketWrap");
@@ -702,23 +659,18 @@
     lines.push(`Class/Period: ${data.student.classPeriod || "—"}`);
     lines.push(`Teacher: ${data.student.teacher || "—"}`);
     lines.push(`Started: ${started}`);
-    lines.push(`Total Invested: ${invested} (must be ≥ $9,500 and ≤ $10,000)`);
+    lines.push(`Total Invested: ${invested}`);
     lines.push(`Tickers: ${tickers}`);
     lines.push(`Categories: ${cats}`);
-    lines.push(`Entries Saved: ${entriesCount} (goal: 6 total entries)`);
+    lines.push(`Entries Saved: ${entriesCount} (goal: 6)`);
     lines.push("----------------------------------------------");
-    if(!last){
-      lines.push("No entry saved yet. Save your baseline (first check-in) to begin tracking.");
-    } else {
+    if(last){
       lines.push(`Latest Entry Date: ${last.dateISO}`);
       lines.push(`Saved At: ${last.savedAt.local}`);
       lines.push(`Current Portfolio Value: ${currentValue}`);
       lines.push(`Gain/Loss vs Invested: ${gain}`);
-      lines.push("----------------------------------------------");
-      lines.push("Portfolio Rationale:");
-      (data.portfolio || []).forEach(p=>{
-        lines.push(`- ${p.ticker} (${p.category}) | Invested: ${fmtMoney(p.dollars)} | Reason: ${p.reason}`);
-      });
+    } else {
+      lines.push("No entry saved yet.");
     }
     lines.push("==============================================");
 
@@ -726,115 +678,28 @@
     tWrap.style.display = "block";
   }
 
-  function csvSafe(s){
-    const x = (s ?? "").toString().replaceAll('"','""');
-    return `"${x}"`;
-  }
-
-  function downloadCSV(){
-    const tickers = (data.portfolio || []).map(p=>p.ticker);
-    const rows = [];
-    rows.push([
-      "Student","ClassPeriod","Teacher","StudentKey","StartedISO","EntryDate","SavedAtISO",
-      ...tickers.map(t=>`${t}_Price`),
-      "PortfolioValue","GainLoss","TotalInvested"
-    ].join(","));
-
-    const totalInvested = getTotalInvested();
-    for(const e of data.entries){
-      const line = [
-        csvSafe(data.student.name),
-        csvSafe(data.student.classPeriod),
-        csvSafe(data.student.teacher),
-        csvSafe(data.studentKey),
-        csvSafe(data.startedAt?.iso || ""),
-        csvSafe(e.dateISO),
-        csvSafe(e.savedAt?.iso || ""),
-        ...tickers.map(t => Number(e.prices[t] ?? "").toString()),
-        (e.value==null ? "" : Number(e.value).toFixed(2)),
-        (e.gain==null ? "" : Number(e.gain).toFixed(2)),
-        Number(totalInvested).toFixed(2)
-      ].join(",");
-      rows.push(line);
-    }
-
-    const blob = new Blob([rows.join("\n")], {type:"text/csv"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(data.student.name || "student").replaceAll(" ","_")}_stock_assignment.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 800);
-  }
-
   /* ===========================
-     RESTORE FROM TEACHER SHEET
+     START FLOW (JSONP WRITE + RESTORE)
      =========================== */
-  async function restoreFromSheet(){
-    const st = $("restoreStatus");
-    st.textContent = "Checking script…";
-
-    // must have name + period to compute key
-    const name = $("studentName").value.trim();
-    const period = $("classPeriod").value.trim();
-    if(!name || !period){
-      st.textContent = "Enter Name + Period first.";
-      return;
-    }
-
-    const ok = await pingScript();
-    if(!ok){
-      st.textContent = "Script not reachable. Check deployment + /exec URL.";
-      return;
-    }
-
-    st.textContent = "Searching…";
-    const sk = studentKeyFrom(name, period);
-
-    const res = await jsonp("student", { studentKey: sk });
-    if(!res.ok){
-      st.textContent = `Restore failed: ${res.error || "unknown"}`;
-      return;
-    }
-    if(!res.found){
-      st.textContent = "No saved record found yet for this Name + Period.";
-      return;
-    }
-
-    // hydrate local data from sheet
-    data.student = {
-      name,
-      classPeriod: period,
-      teacher: $("teacherName").value.trim()
-    };
-    data.studentKey = sk;
-    data.startedAt = res.startedAt || nowStamp();
-    data.portfolio = Array.isArray(res.portfolio) ? res.portfolio : [];
-    data.entries = Array.isArray(res.entries) ? res.entries : [];
-    save();
-
-    st.textContent = `Restored ✅ (${data.entries.length} entries)`;
-    lockStartAndShowMain();
-  }
-
-  /* ===========================
-     INIT + EVENTS
-     =========================== */
-
-  // hydrate inputs from local
   $("studentName").value = data.student.name || "";
   $("classPeriod").value = data.student.classPeriod || "";
   $("teacherName").value = data.student.teacher || "";
 
   renderPortfolioInputs();
 
-  // Boot to main if already started locally
+  // If already started locally, go main
   if(data.startedAt && Array.isArray(data.portfolio) && data.portfolio.length === 5){
     lockStartAndShowMain();
   }
 
-  $("restoreBtn").addEventListener("click", restoreFromSheet);
+  // Attempt restore when name/period typed (Chromebook-safe)
+  let restoreTimer = null;
+  function scheduleRestore(){
+    clearTimeout(restoreTimer);
+    restoreTimer = setTimeout(restoreFromSheetIfPossible, 350);
+  }
+  $("studentName").addEventListener("input", scheduleRestore);
+  $("classPeriod").addEventListener("input", scheduleRestore);
 
   $("startBtn").addEventListener("click", async () => {
     const v = validateStart();
@@ -846,24 +711,32 @@
     data.portfolio = v.portfolio;
     save();
 
-    const msg = $("startMsg");
-    msg.className = "msg show warn";
-    msg.textContent = "Starting…";
+    const payload = {
+      classCode: CLASS_CODE,
+      type: "START",
+      studentKey: data.studentKey,
+      student: data.student,
+      startedAt: data.startedAt,
+      portfolio: data.portfolio,
+      totalInvested: getTotalInvested()
+    };
 
-    const serverRes = await postEvent("START", null);
+    const serverRes = await jsonp("log", { payload: JSON.stringify(payload) });
+
+    const msg = $("startMsg");
     if(serverRes.ok){
       msg.className = "msg show good";
       msg.textContent = "Started ✅ Posted to teacher sheet.";
     } else {
       msg.className = "msg show warn";
-      msg.textContent = `Started locally ✅, but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`;
+      msg.textContent = `Started locally ✅ but could NOT post. (${serverRes.error || "unknown"})`;
     }
 
     lockStartAndShowMain();
   });
 
   $("wipeBtn").addEventListener("click", () => {
-    const ok = confirm("Hard Reset clears ALL saved data for this assignment on this device. Continue?");
+    const ok = confirm("Hard Reset clears ALL saved data on this device. Continue?");
     if(ok) restartAssignment();
   });
 
@@ -877,28 +750,25 @@
       await navigator.clipboard.writeText(text);
       const m = $("entryMsg");
       m.className = "msg show good";
-      m.textContent = "Ticket copied ✅ Paste into Google Classroom if needed.";
+      m.textContent = "Ticket copied ✅";
     }catch(e){
       const m = $("entryMsg");
       m.className = "msg show warn";
-      m.textContent = "Could not auto-copy (browser blocked). Screenshot the ticket instead.";
+      m.textContent = "Browser blocked auto-copy. Screenshot instead.";
     }
   });
 
-  $("downloadCsvBtn").addEventListener("click", downloadCSV);
-
   $("restartBtn").addEventListener("click", () => {
-    const ok = confirm("Restart Assignment? This clears this device’s saved assignment for YOU.");
+    const ok = confirm("Restart Assignment? Clears this device’s saved work.");
     if(ok) restartAssignment();
   });
 
   $("switchStudentBtn").addEventListener("click", () => {
-    const ok = confirm("Switch Student? This clears the saved assignment on THIS device so another student can log in.");
+    const ok = confirm("Switch Student? Clears saved work on THIS device.");
     if(ok) restartAssignment();
   });
 
   $("refreshBoardBtn").addEventListener("click", refreshLeaderboard);
-
 })();
 </script>
 </body>
