@@ -13,7 +13,7 @@
         <h1>Stock Market Assignment Hub</h1>
         <p>
           6-week portfolio tracker (5 stocks • $10,000 start • diversify • weekly check-ins).
-          Auto-saves locally AND posts progress to a teacher Google Sheet for monitoring + leaderboard.
+          Cloud-saves to a teacher Google Sheet so Chromebooks don’t lose progress.
         </p>
       </div>
       <div class="badge">
@@ -27,18 +27,18 @@
         <h2>Game 1 — Stock Market Assignment Tracker</h2>
         <p>
           Students pick 5 stocks, allocate $10,000 (use ≥ $9,500), write a brief rationale,
-          and enter prices for each check-in. Posts to teacher’s Google Sheet automatically.
+          and enter prices for each check-in. Restores automatically from the teacher sheet.
         </p>
         <div class="row">
           <a class="btn primary" href="games/stock-market-assignment.html">Launch Tracker</a>
-          <span class="chip">Name required</span>
-          <span class="chip">Time/date stamps</span>
-          <span class="chip">Class-wide leaderboard</span>
+          <span class="chip">Name+Period required</span>
+          <span class="chip">Auto-restore from sheet</span>
+          <span class="chip">Leaderboard</span>
         </div>
         <div class="hr"></div>
         <div class="small">
-          Tip: Students should use the same device for best continuity (local auto-save). Even if they swap devices,
-          the Google Sheet still captures check-ins.
+          Chromebook-safe: students can close / reboot / switch devices — their work restores from the teacher sheet
+          when they enter the same Name + Period.
         </div>
       </div>
 
@@ -50,10 +50,11 @@
         <div class="row">
           <a class="btn good" href="teacher-dashboard.html">Open Teacher Dashboard</a>
           <span class="chip">Live class data</span>
+          <span class="chip">Compliance tracker</span>
         </div>
         <div class="hr"></div>
         <div class="small">
-          Note: Teacher dashboard requires the Apps Script Web App to be deployed and the SCRIPT URL added.
+          Note: Dashboard requires the Apps Script Web App to be deployed and the SCRIPT URL pasted into the files below.
         </div>
       </div>
     </div>
