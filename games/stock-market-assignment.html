@@ -158,7 +158,8 @@
   const CLASS_CODE = "STOCK6WEEK";
 
   /* ===========================
-     JSONP (NO CORS) — GET READ/WRITE
+     JSONP (NO CORS) — GET READ ONLY
+     (leaderboard, compliance, student, ping)
      =========================== */
   function jsonp(fn, params = {}){
     return new Promise((resolve) => {
@@ -188,6 +189,32 @@
       };
       document.body.appendChild(script);
     });
+  }
+
+  /* ===========================
+     POST WRITE — for fn=log
+     (fixes Unknown fn (GET) + avoids URL-length limits)
+     =========================== */
+  async function postLog(payload){
+    try{
+      const body = new URLSearchParams({
+        fn: "log",
+        classCode: CLASS_CODE,
+        payload: JSON.stringify(payload)
+      });
+
+      // no-cors means we cannot read response, but the POST will still go through
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body
+      });
+
+      return { ok:true };
+    }catch(err){
+      return { ok:false, error: String(err && err.message ? err.message : err) };
+    }
   }
 
   /* ===========================
@@ -278,7 +305,6 @@
       const msg = $("startMsg");
       msg.className = "msg show good";
       msg.textContent = "Restored from teacher sheet ✅ You can continue without re-entering everything.";
-      // If restored and portfolio exists, jump to main
       if(data.startedAt && data.portfolio.length === 5) lockStartAndShowMain();
     }
   }
@@ -556,7 +582,7 @@
   }
 
   /* ===========================
-     SAVE ENTRY (JSONP WRITE)
+     SAVE ENTRY (POST WRITE)
      =========================== */
   async function saveEntry(){
     const msg = $("entryMsg");
@@ -604,7 +630,6 @@
     data.entries.sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
     save();
 
-    // JSONP write to sheet
     const payload = {
       classCode: CLASS_CODE,
       type: "ENTRY",
@@ -616,15 +641,17 @@
       entry: { dateISO, savedAt, prices, value, gain, entriesCount: data.entries.length }
     };
 
-    const serverRes = await jsonp("log", { payload: JSON.stringify(payload) });
+    // POST write (this fixes Unknown fn GET)
+    const postRes = await postLog(payload);
 
-    if(serverRes.ok){
+    if(postRes.ok){
       msg.className = "msg show good";
-      msg.textContent = `Saved ✅ (${dateISO}) and posted to teacher sheet.`;
-      refreshLeaderboard();
+      msg.textContent = `Saved ✅ (${dateISO}) and posted to teacher sheet. Refreshing leaderboard…`;
+      // give Apps Script a second to write + rebuild sheets
+      setTimeout(refreshLeaderboard, 1200);
     } else {
       msg.className = "msg show warn";
-      msg.textContent = `Saved locally ✅ but could NOT post. (${serverRes.error || "unknown"})`;
+      msg.textContent = `Saved locally ✅ but could NOT post. (${postRes.error || "unknown"})`;
     }
 
     for(const p of (data.portfolio || [])){
@@ -679,7 +706,7 @@
   }
 
   /* ===========================
-     START FLOW (JSONP WRITE + RESTORE)
+     START FLOW (POST WRITE)
      =========================== */
   $("studentName").value = data.student.name || "";
   $("classPeriod").value = data.student.classPeriod || "";
@@ -687,12 +714,10 @@
 
   renderPortfolioInputs();
 
-  // If already started locally, go main
   if(data.startedAt && Array.isArray(data.portfolio) && data.portfolio.length === 5){
     lockStartAndShowMain();
   }
 
-  // Attempt restore when name/period typed (Chromebook-safe)
   let restoreTimer = null;
   function scheduleRestore(){
     clearTimeout(restoreTimer);
@@ -721,15 +746,15 @@
       totalInvested: getTotalInvested()
     };
 
-    const serverRes = await jsonp("log", { payload: JSON.stringify(payload) });
+    const postRes = await postLog(payload);
 
     const msg = $("startMsg");
-    if(serverRes.ok){
+    if(postRes.ok){
       msg.className = "msg show good";
       msg.textContent = "Started ✅ Posted to teacher sheet.";
     } else {
       msg.className = "msg show warn";
-      msg.textContent = `Started locally ✅ but could NOT post. (${serverRes.error || "unknown"})`;
+      msg.textContent = `Started locally ✅ but could NOT post. (${postRes.error || "unknown"})`;
     }
 
     lockStartAndShowMain();
