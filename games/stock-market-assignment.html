@@ -13,10 +13,10 @@
       <h1>Stock Market Assignment — 6 Week Tracker</h1>
       <p>
         Choose 5 stocks • Invest $10,000 total • Use at least $9,500 • Diversify categories •
-        Enter prices each check-in • Teacher can view progress + leaderboard.
+        Enter prices each check-in • Auto-restores from teacher sheet (Chromebook-safe).
       </p>
     </div>
-    <div class="badge"><span>📈</span><span><strong>Auto-Saves</strong></span></div>
+    <div class="badge"><span>📈</span><span><strong>Cloud Restore</strong></span></div>
   </div>
 
   <!-- START PANEL -->
@@ -40,11 +40,18 @@
           </div>
         </div>
 
+        <div class="row" style="margin-top:10px">
+          <button class="btn good" id="loadBtn" type="button">Load My Saved Assignment</button>
+          <span class="small" id="loadHint">If you already started earlier, click this first.</span>
+        </div>
+
+        <div id="loadMsg" class="msg"></div>
+
         <div class="hr"></div>
 
         <h2 id="step2">Step 2 — Build Your Portfolio (5 different stocks)</h2>
         <p class="small">
-          Enter a ticker, category, dollars invested, and a 1–2 sentence reason for each stock.
+          If you are NEW: enter a ticker, category, dollars invested, and a 1–2 sentence reason for each stock.
           You must invest at least <strong>$9,500</strong> total and use <strong>exactly 5 different tickers</strong>.
         </p>
 
@@ -62,7 +69,7 @@
 
         <div class="footerNote">
           Prices: Use a teacher-approved source (Google Finance, Yahoo Finance, broker app).<br/>
-          This tool sends check-ins to a teacher Google Sheet to verify completion + leaderboard.
+          This tool logs check-ins to a teacher Google Sheet for verification + leaderboard.
         </div>
       </div>
     </div>
@@ -83,7 +90,7 @@
       <div class="card" style="grid-column:span 12">
         <h2>Class Leaderboard (Live)</h2>
         <div class="small">
-          Pulls from teacher Google Sheet. If it shows empty, check internet + Apps Script deployment.
+          Pulls from the teacher Google Sheet. If empty, teacher sheet may have no entries yet.
         </div>
         <div id="leaderboardTable" class="tableWrap"></div>
         <div class="row" style="margin-top:10px">
@@ -162,17 +169,17 @@
   /* ===========================
      CONFIG — SET ONCE
      =========================== */
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSLJ54OVArhIi6tD8YunOKQVyVgXFxhwOSFpIFsP4l4mjPv8ziG4Y2lwOspL2P7oWo/exec";
+  const SCRIPT_URL = "PASTE_YOUR_WEB_APP_EXEC_URL_HERE"; // e.g. https://script.google.com/macros/s/AKfy.../exec
   const CLASS_CODE = "STOCK6WEEK";
 
   /* ===========================
-     SAFE CLONE (no structuredClone)
+     UTIL
      =========================== */
-  function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
-
-  const STORAGE_KEY = "stock_assignment_v2";
+  const STORAGE_KEY = "stock_assignment_cloud_v1";
   const $ = (id) => document.getElementById(id);
-  const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { style:"currency", currency:"USD", maximumFractionDigits:2 });
+
+  function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+  function fmtMoney(n){ return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD",maximumFractionDigits:2}); }
 
   function nowStamp(){
     const d = new Date();
@@ -186,6 +193,14 @@
     const mm = String(d.getMonth()+1).padStart(2,"0");
     const dd = String(d.getDate()).padStart(2,"0");
     return `${yyyy}-${mm}-${dd}`;
+  }
+  function escapeHtml(s){
+    return (s ?? "").toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
   function studentKeyFrom(name, period){
     return `${name}`.trim().toLowerCase() + " | " + `${period}`.trim().toLowerCase();
@@ -205,9 +220,9 @@
     entries: []          // [{dateISO, savedAt, prices, value, gain}]
   };
 
-  let data = load();
+  let data = loadLocal();
 
-  function load(){
+  function loadLocal(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       if(!raw) return deepClone(defaultData);
@@ -217,83 +232,89 @@
       return deepClone(defaultData);
     }
   }
-  function save(){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  function saveLocal(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
     const s = $("savedIndicator");
     if(s){
       s.textContent = "Saved ✅";
-      setTimeout(() => (s.textContent = ""), 900);
+      setTimeout(() => (s.textContent=""), 900);
     }
   }
 
   /* ===========================
-     CORS-SAFE SHEET BRIDGE
-     - POST: sendBeacon / fetch no-cors (fire-and-forget)
-     - GET: JSONP (script tag)
+     JSONP (no CORS issues)
      =========================== */
-  async function postToSheet(payload){
-    if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")){
-      return { ok:false, error:"SCRIPT_URL not set" };
-    }
-
-    try{
-      const body = JSON.stringify(payload);
-
-      if(navigator.sendBeacon){
-        const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
-        const ok = navigator.sendBeacon(SCRIPT_URL, blob);
-        return ok ? { ok:true, note:"beacon-sent" } : { ok:false, error:"sendBeacon failed" };
-      }
-
-      await fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body
-      });
-
-      return { ok:true, note:"no-cors-sent" };
-    }catch(e){
-      return { ok:false, error:"Network/Beacon error" };
-    }
-  }
-
-  function getFromSheet(fn){
+  function jsonp(url, timeoutMs=12000){
     return new Promise((resolve) => {
-      if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")){
-        resolve({ ok:false, error:"SCRIPT_URL not set" });
-        return;
-      }
-      const cb = `__jsonp_cb_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      const url =
-        `${SCRIPT_URL}?fn=${encodeURIComponent(fn)}` +
-        `&classCode=${encodeURIComponent(CLASS_CODE)}` +
-        `&callback=${encodeURIComponent(cb)}` +
-        `&_=${Date.now()}`;
-
+      const cbName = "__cb_" + Math.random().toString(36).slice(2);
       const script = document.createElement("script");
-      script.src = url;
-      script.async = true;
+      let done = false;
 
-      const cleanup = () => {
-        try{ delete window[cb]; }catch(_){}
+      window[cbName] = (payload) => {
+        if(done) return;
+        done = true;
+        cleanup();
+        resolve(payload);
+      };
+
+      const timer = setTimeout(() => {
+        if(done) return;
+        done = true;
+        cleanup();
+        resolve({ ok:false, error:"Timeout" });
+      }, timeoutMs);
+
+      function cleanup(){
+        clearTimeout(timer);
+        try{ delete window[cbName]; }catch(e){ window[cbName] = undefined; }
         if(script && script.parentNode) script.parentNode.removeChild(script);
-      };
+      }
 
-      window[cb] = (data) => {
-        cleanup();
-        resolve(data);
-      };
-
+      const joiner = url.includes("?") ? "&" : "?";
+      script.src = url + joiner + "callback=" + encodeURIComponent(cbName) + "&_=" + Date.now();
       script.onerror = () => {
+        if(done) return;
+        done = true;
         cleanup();
-        resolve({ ok:false, error:"JSONP load error" });
+        resolve({ ok:false, error:"Network/Script error" });
       };
-
       document.body.appendChild(script);
     });
   }
 
+  function requireScriptUrl(){
+    return SCRIPT_URL && !SCRIPT_URL.includes("PASTE_YOUR");
+  }
+
+  async function apiGet(fn, params={}){
+    if(!requireScriptUrl()) return { ok:false, error:"SCRIPT_URL not set" };
+    const qs = new URLSearchParams({ fn, classCode: CLASS_CODE, ...params }).toString();
+    return await jsonp(`${SCRIPT_URL}?${qs}`);
+  }
+
+  async function apiLog(type, extra={}){
+    if(!requireScriptUrl()) return { ok:false, error:"SCRIPT_URL not set" };
+    // Minimal URL-sized payload (works in schools / GitHub Pages)
+    const payload = {
+      classCode: CLASS_CODE,
+      type,
+      studentKey: data.studentKey,
+      name: data.student.name,
+      period: data.student.classPeriod,
+      teacher: data.student.teacher,
+      startedAtISO: data.startedAt?.iso || "",
+      totalInvested: getTotalInvested(),
+      portfolioJSON: JSON.stringify(data.portfolio || []),
+      entryJSON: extra.entryJSON || "",
+      entriesCount: (data.entries || []).length
+    };
+    const qs = new URLSearchParams({ fn:"log", ...payload }).toString();
+    return await jsonp(`${SCRIPT_URL}?${qs}`, 15000);
+  }
+
+  /* ===========================
+     RENDER
+     =========================== */
   function renderPortfolioInputs(){
     const wrap = $("portfolioInputs");
     wrap.innerHTML = "";
@@ -346,93 +367,12 @@
     return (data.portfolio || []).reduce((s,p)=>s+Number(p.dollars||0),0);
   }
 
-  function validateStart(){
-    const msg = $("startMsg");
-    msg.className = "msg show warn";
-    msg.textContent = "";
-
-    const name = $("studentName").value.trim();
-    const period = $("classPeriod").value.trim();
-    if(!name){
-      msg.className = "msg show bad";
-      msg.textContent = "Name is required to start.";
-      return null;
-    }
-    if(!period){
-      msg.className = "msg show bad";
-      msg.textContent = "Class/Period is required to start (prevents duplicate names).";
-      return null;
-    }
-
-    const portfolio = [];
-    for(let i=0;i<5;i++){
-      const ticker = ($(`t_${i}`).value || "").trim().toUpperCase();
-      const category = $(`c_${i}`).value;
-      const dollars = Number($(`d_${i}`).value);
-      const reason = ($(`r_${i}`).value || "").trim();
-
-      if(!ticker || !category || !Number.isFinite(dollars) || dollars <= 0 || !reason){
-        msg.className = "msg show bad";
-        msg.textContent = "All 5 stocks must have: ticker, category, dollars invested (>0), and a brief reason.";
-        return null;
-      }
-      portfolio.push({ ticker, category, dollars, reason });
-    }
-
-    const tickers = portfolio.map(p=>p.ticker);
-    if(new Set(tickers).size !== 5){
-      msg.className = "msg show bad";
-      msg.textContent = "You must choose 5 DIFFERENT stocks (no duplicate tickers).";
-      return null;
-    }
-
-    const total = portfolio.reduce((s,p)=>s+p.dollars,0);
-    if(total > 10000.0001){
-      msg.className = "msg show bad";
-      msg.textContent = `You invested ${fmtMoney(total)}. You only have $10,000. Reduce your total.`;
-      return null;
-    }
-    if(total < 9500){
-      msg.className = "msg show bad";
-      msg.textContent = `You invested ${fmtMoney(total)}. You must invest at least $9,500.`;
-      return null;
-    }
-
-    const cats = new Set(portfolio.map(p=>p.category));
-    if(cats.size === 1){
-      msg.className = "msg show warn";
-      msg.textContent = "Warning: All 5 stocks are the same category. Diversification is recommended.";
-    }else{
-      msg.className = "msg show good";
-      msg.textContent = "Looks good. Click Start Assignment.";
-    }
-
-    return {
-      student: {
-        name,
-        classPeriod: period,
-        teacher: ($("teacherName").value || "").trim()
-      },
-      portfolio
-    };
-  }
-
-  function escapeHtml(s){
-    return (s ?? "")
-      .toString()
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
   function renderPortfolioSummary(){
     const el = $("portfolioSummary");
     const total = getTotalInvested();
     const rows = (data.portfolio || []).map(p => `
       <tr>
-        <td><strong>${p.ticker}</strong><div class="small">${p.category}</div></td>
+        <td><strong>${escapeHtml(p.ticker)}</strong><div class="small">${escapeHtml(p.category)}</div></td>
         <td>${fmtMoney(p.dollars)}</td>
         <td class="small">${escapeHtml(p.reason)}</td>
       </tr>
@@ -462,7 +402,7 @@
     tickers.forEach((t)=>{
       const div = document.createElement("div");
       div.innerHTML = `
-        <label>${t} — Current Price (USD)</label>
+        <label>${escapeHtml(t)} — Current Price (USD)</label>
         <input type="number" step="0.01" min="0" id="p_${t}" placeholder="Enter today’s price"/>
       `;
       wrap.appendChild(div);
@@ -506,7 +446,7 @@
         <tr>
           <th>Date</th>
           <th>Saved Time</th>
-          ${tickers.map(t=>`<th>${t}</th>`).join("")}
+          ${tickers.map(t=>`<th>${escapeHtml(t)}</th>`).join("")}
           <th>Portfolio Value</th>
           <th>Gain/Loss</th>
         </tr>
@@ -518,8 +458,8 @@
       const gainStr = (e.gain==null) ? "—" : fmtMoney(e.gain);
       return `
         <tr>
-          <td><strong>${e.dateISO}</strong></td>
-          <td class="small">${e.savedAt.local}</td>
+          <td><strong>${escapeHtml(e.dateISO)}</strong></td>
+          <td class="small">${escapeHtml(e.savedAt.local)}</td>
           ${tickers.map(t=>`<td>${Number(e.prices[t]).toFixed(2)}</td>`).join("")}
           <td><strong>${valueStr}</strong></td>
           <td>${gainStr}</td>
@@ -530,14 +470,43 @@
     el.innerHTML = `<div class="tableWrap"><table>${head}<tbody>${body}</tbody></table></div>`;
   }
 
+  function lockStartAndShowMain(){
+    $("startPanel").style.display = "none";
+    $("mainPanel").style.display = "block";
+
+    $("kpiName").textContent = data.student.name || "—";
+    $("kpiStart").textContent = data.startedAt ? data.startedAt.local : "—";
+    $("kpiInvested").textContent = fmtMoney(getTotalInvested());
+
+    renderPortfolioSummary();
+    renderPriceInputs();
+    renderLog();
+    updateCurrentKPI();
+    refreshLeaderboard();
+  }
+
+  function restartAssignment(){
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    data = deepClone(defaultData);
+    location.reload();
+  }
+
+  function setMsg(el, kind, text){
+    el.className = "msg show " + kind;
+    el.textContent = text;
+  }
+
+  /* ===========================
+     LEADERBOARD
+     =========================== */
   function setBoardStatus(t){ $("boardStatus").textContent = t; }
 
   async function refreshLeaderboard(){
     setBoardStatus("Loading…");
-    const res = await getFromSheet("leaderboard");
-    if(!res || !res.ok){
+    const res = await apiGet("leaderboard");
+    if(!res.ok){
       setBoardStatus("Error loading leaderboard.");
-      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. Check Apps Script deployment + class code.</div>`;
+      $("leaderboardTable").innerHTML = `<div class="small">Could not load leaderboard. Teacher may need to deploy web app as “Anyone”.</div>`;
       return;
     }
     setBoardStatus(`Updated: ${new Date().toLocaleTimeString()}`);
@@ -575,27 +544,116 @@
     `;
   }
 
-  function lockStartAndShowMain(){
-    $("startPanel").style.display = "none";
-    $("mainPanel").style.display = "block";
-
-    $("kpiName").textContent = data.student.name || "—";
-    $("kpiStart").textContent = data.startedAt ? data.startedAt.local : "—";
-    $("kpiInvested").textContent = fmtMoney(getTotalInvested());
-
-    renderPortfolioSummary();
-    renderPriceInputs();
-    renderLog();
-    updateCurrentKPI();
-    refreshLeaderboard();
+  /* ===========================
+     VALIDATION + START
+     =========================== */
+  function validateIdentity(){
+    const name = $("studentName").value.trim();
+    const period = $("classPeriod").value.trim();
+    if(!name) return { ok:false, error:"Name is required." };
+    if(!period) return { ok:false, error:"Class/Period is required." };
+    return {
+      ok:true,
+      student: {
+        name,
+        classPeriod: period,
+        teacher: ($("teacherName").value || "").trim()
+      }
+    };
   }
 
-  function restartAssignment(){
-    localStorage.removeItem(STORAGE_KEY);
-    data = deepClone(defaultData);
-    location.reload();
+  function validateNewPortfolio(){
+    const msg = $("startMsg");
+    msg.className = "msg show warn";
+    msg.textContent = "";
+
+    const portfolio = [];
+    for(let i=0;i<5;i++){
+      const ticker = ($(`t_${i}`).value || "").trim().toUpperCase();
+      const category = $(`c_${i}`).value;
+      const dollars = Number($(`d_${i}`).value);
+      const reason = ($(`r_${i}`).value || "").trim();
+
+      if(!ticker || !category || !Number.isFinite(dollars) || dollars <= 0 || !reason){
+        setMsg(msg,"bad","All 5 stocks must have: ticker, category, dollars invested (>0), and a brief reason.");
+        return null;
+      }
+      portfolio.push({ ticker, category, dollars, reason });
+    }
+
+    const tickers = portfolio.map(p=>p.ticker);
+    if(new Set(tickers).size !== 5){
+      setMsg(msg,"bad","You must choose 5 DIFFERENT stocks (no duplicate tickers).");
+      return null;
+    }
+
+    const total = portfolio.reduce((s,p)=>s+p.dollars,0);
+    if(total > 10000.0001){
+      setMsg(msg,"bad",`You invested ${fmtMoney(total)}. You only have $10,000. Reduce your total.`);
+      return null;
+    }
+    if(total < 9500){
+      setMsg(msg,"bad",`You invested ${fmtMoney(total)}. You must invest at least $9,500.`);
+      return null;
+    }
+
+    const cats = new Set(portfolio.map(p=>p.category));
+    if(cats.size === 1){
+      setMsg(msg,"warn","Warning: All 5 stocks are the same category. Diversification is recommended.");
+    } else {
+      setMsg(msg,"good","Looks good. Click Start Assignment.");
+    }
+    return portfolio;
   }
 
+  /* ===========================
+     CLOUD RESTORE (Option B)
+     =========================== */
+  async function loadFromCloud(){
+    const identity = validateIdentity();
+    const msg = $("loadMsg");
+    if(!identity.ok){
+      setMsg(msg,"bad",identity.error);
+      return;
+    }
+    if(!requireScriptUrl()){
+      setMsg(msg,"bad","Teacher setup missing: SCRIPT_URL not pasted into this file.");
+      return;
+    }
+
+    data.student = identity.student;
+    data.studentKey = studentKeyFrom(identity.student.name, identity.student.classPeriod);
+    saveLocal();
+
+    setMsg(msg,"warn","Checking teacher sheet for your saved assignment…");
+
+    const res = await apiGet("student", { studentKey: data.studentKey });
+    if(!res.ok){
+      setMsg(msg,"bad",`Could not load from teacher sheet. (${res.error || "unknown"})`);
+      return;
+    }
+
+    if(!res.found){
+      setMsg(msg,"warn","No saved assignment found yet. If you are new, fill out Step 2 and click Start Assignment.");
+      return;
+    }
+
+    try{
+      data.startedAt = res.startedAt || data.startedAt || nowStamp();
+      data.portfolio = Array.isArray(res.portfolio) ? res.portfolio : [];
+      data.entries = Array.isArray(res.entries) ? res.entries : [];
+      data.entries.sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
+      saveLocal();
+      setMsg(msg,"good","Loaded ✅ Your portfolio + entries were restored from the teacher sheet.");
+      lockStartAndShowMain();
+    }catch(e){
+      setMsg(msg,"bad","Found data but could not restore it (data format error). Tell teacher to contact the creator.");
+    }
+  }
+
+  /* ===========================
+     SAVE ENTRY
+     =========================== */
   async function saveEntry(){
     const msg = $("entryMsg");
     msg.className = "msg show warn";
@@ -603,8 +661,7 @@
 
     const dateISO = $("checkinDate").value;
     if(!dateISO){
-      msg.className = "msg show bad";
-      msg.textContent = "Check-in date is required.";
+      setMsg(msg,"bad","Check-in date is required.");
       return;
     }
 
@@ -613,16 +670,14 @@
       const t = p.ticker;
       const v = Number($(`p_${t}`).value);
       if(!Number.isFinite(v) || v <= 0){
-        msg.className = "msg show bad";
-        msg.textContent = `Enter a valid price for ${t}.`;
+        setMsg(msg,"bad",`Enter a valid price for ${t}.`);
         return;
       }
       prices[t] = v;
     }
 
     if(data.entries.findIndex(e => e.dateISO === dateISO) !== -1){
-      msg.className = "msg show bad";
-      msg.textContent = "You already saved an entry for this date.";
+      setMsg(msg,"bad","You already saved an entry for this date.");
       return;
     }
 
@@ -640,28 +695,17 @@
 
     data.entries.push({ dateISO, savedAt, prices, value, gain });
     data.entries.sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
-    save();
+    saveLocal();
 
-    const payload = {
-      classCode: CLASS_CODE,
-      type: "ENTRY",
-      studentKey: data.studentKey,
-      student: data.student,
-      startedAt: data.startedAt,
-      portfolio: data.portfolio,
-      entry: { dateISO, savedAt, prices, value, gain, entriesCount: data.entries.length },
-      meta: { userAgent: navigator.userAgent }
-    };
-
-    const serverRes = await postToSheet(payload);
+    // CLOUD LOG (JSONP write)
+    const entryJSON = JSON.stringify({ dateISO, savedAt, prices, value, gain });
+    const serverRes = await apiLog("ENTRY", { entryJSON });
 
     if(serverRes.ok){
-      msg.className = "msg show good";
-      msg.textContent = `Saved ✅ (${dateISO}). Sent to teacher sheet.`;
+      setMsg(msg,"good",`Saved ✅ (${dateISO}) and posted to teacher sheet.`);
       refreshLeaderboard();
     } else {
-      msg.className = "msg show warn";
-      msg.textContent = `Saved locally ✅ but could NOT send to teacher sheet. (${serverRes.error || "unknown"})`;
+      setMsg(msg,"warn",`Saved locally ✅ but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`);
     }
 
     for(const p of (data.portfolio || [])){
@@ -672,6 +716,9 @@
     updateCurrentKPI();
   }
 
+  /* ===========================
+     TICKET + CSV
+     =========================== */
   function buildTicket(){
     const tWrap = $("ticketWrap");
     const tBox = $("ticketBox");
@@ -721,7 +768,6 @@
     const x = (s ?? "").toString().replaceAll('"','""');
     return `"${x}"`;
   }
-
   function downloadCSV(){
     const tickers = (data.portfolio || []).map(p=>p.ticker);
     const rows = [];
@@ -759,52 +805,59 @@
     setTimeout(()=>URL.revokeObjectURL(a.href), 800);
   }
 
-  // Hydrate start form
+  /* ===========================
+     START ASSIGNMENT
+     =========================== */
+  async function startAssignment(){
+    const identity = validateIdentity();
+    if(!identity.ok){
+      setMsg($("startMsg"),"bad",identity.error);
+      return;
+    }
+
+    data.student = identity.student;
+    data.studentKey = studentKeyFrom(identity.student.name, identity.student.classPeriod);
+
+    const portfolio = validateNewPortfolio();
+    if(!portfolio) return;
+
+    if(!data.startedAt) data.startedAt = nowStamp();
+    data.portfolio = portfolio;
+
+    // Reset entries if they’re creating a brand new portfolio (prevents mismatched base)
+    if(!Array.isArray(data.entries)) data.entries = [];
+
+    saveLocal();
+
+    // CLOUD LOG START (JSONP write)
+    const serverRes = await apiLog("START");
+
+    const msg = $("startMsg");
+    if(serverRes.ok){
+      setMsg(msg,"good","Started ✅ Posted to teacher sheet.");
+    } else {
+      setMsg(msg,"warn",`Started locally ✅, but could NOT post to teacher sheet. (${serverRes.error || "unknown"})`);
+    }
+
+    lockStartAndShowMain();
+  }
+
+  /* ===========================
+     BOOT
+     =========================== */
   $("studentName").value = data.student.name || "";
   $("classPeriod").value = data.student.classPeriod || "";
   $("teacherName").value = data.student.teacher || "";
-
   renderPortfolioInputs();
 
-  // Boot to main if already started
+  // If local has a valid started session, go main (helps on non-Chromebook devices)
   if(data.startedAt && Array.isArray(data.portfolio) && data.portfolio.length === 5){
     lockStartAndShowMain();
   }
 
-  $("startBtn").addEventListener("click", async () => {
-    const v = validateStart();
-    if(!v) return;
-
-    if(!data.startedAt) data.startedAt = nowStamp();
-
-    data.student = v.student;
-    data.studentKey = studentKeyFrom(v.student.name, v.student.classPeriod);
-    data.portfolio = v.portfolio;
-    save();
-
-    const payload = {
-      classCode: CLASS_CODE,
-      type: "START",
-      studentKey: data.studentKey,
-      student: data.student,
-      startedAt: data.startedAt,
-      portfolio: data.portfolio,
-      totalInvested: getTotalInvested(),
-      meta: { userAgent: navigator.userAgent }
-    };
-
-    const serverRes = await postToSheet(payload);
-    const msg = $("startMsg");
-    if(serverRes.ok){
-      msg.className = "msg show good";
-      msg.textContent = "Started ✅ Sent to teacher sheet.";
-    } else {
-      msg.className = "msg show warn";
-      msg.textContent = `Started locally ✅, but could NOT send to teacher sheet. (${serverRes.error || "unknown"})`;
-    }
-
-    lockStartAndShowMain();
-  });
+  // Actions
+  $("loadBtn").addEventListener("click", loadFromCloud);
+  $("startBtn").addEventListener("click", startAssignment);
 
   $("wipeBtn").addEventListener("click", () => {
     const ok = confirm("Hard Reset clears ALL saved data for this assignment on this device. Continue?");
@@ -819,13 +872,9 @@
     const text = $("ticketBox").textContent;
     try{
       await navigator.clipboard.writeText(text);
-      const m = $("entryMsg");
-      m.className = "msg show good";
-      m.textContent = "Ticket copied ✅ Paste into Google Classroom if needed.";
+      setMsg($("entryMsg"),"good","Ticket copied ✅ Paste into Google Classroom if needed.");
     }catch(e){
-      const m = $("entryMsg");
-      m.className = "msg show warn";
-      m.textContent = "Could not auto-copy (browser blocked). Screenshot the ticket instead.";
+      setMsg($("entryMsg"),"warn","Could not auto-copy (browser blocked). Screenshot the ticket instead.");
     }
   });
 
@@ -837,7 +886,7 @@
   });
 
   $("switchStudentBtn").addEventListener("click", () => {
-    const ok = confirm("Switch Student? This clears the saved assignment on THIS device so another student can log in.");
+    const ok = confirm("Switch Student? This clears this device’s saved assignment on THIS device so another student can log in.");
     if(ok) restartAssignment();
   });
 
