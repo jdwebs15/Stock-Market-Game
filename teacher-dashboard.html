@@ -4,16 +4,30 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Teacher Dashboard — Stock Market Assignment</title>
-  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="./styles.css"/>
+  <style>
+    .msg{display:none;padding:10px;border-radius:12px;margin-top:10px}
+    .msg.show{display:block}
+    .msg.good{background:rgba(43,213,118,.12);border:1px solid rgba(43,213,118,.25)}
+    .msg.bad{background:rgba(255,92,122,.12);border:1px solid rgba(255,92,122,.25)}
+    .msg.warn{background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.25)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}
+    .tableWrap{overflow:auto;border:1px solid rgba(255,255,255,.10);border-radius:14px}
+    .small{opacity:.85;font-size:.92rem}
+    .muted{opacity:.7}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95em}
+  </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <div class="title">
       <h1>Teacher Dashboard — Stock Market Assignment</h1>
-      <p>Leaderboard + compliance pulled live from the teacher Google Sheet backend.</p>
+      <p class="small">Leaderboard + compliance pulled live from the teacher Google Sheet backend.</p>
     </div>
-    <div class="badge"><span>🧑‍🏫</span><span><strong>Live</strong></span></div>
+    <div class="badge"><span>📊</span><span><strong>Live</strong></span></div>
   </div>
 
   <div class="panel">
@@ -22,87 +36,115 @@
         <button class="btn good" id="refreshBtn" type="button">Refresh</button>
         <span class="small" id="status">—</span>
       </div>
-      <div class="small">Class Code: <strong id="classCodeLabel">STOCK6WEEK</strong></div>
+      <div class="small muted">Class Code: <strong id="ccLabel">—</strong></div>
     </div>
+
+    <div id="topMsg" class="msg"></div>
 
     <div class="hr"></div>
 
     <div class="grid">
       <div class="card" style="grid-column:span 12">
         <h2>Leaderboard</h2>
-        <div id="leaderboard" class="tableWrap"></div>
+        <div id="leaderWrap" class="tableWrap"></div>
       </div>
+    </div>
 
+    <div class="hr"></div>
+
+    <div class="grid">
       <div class="card" style="grid-column:span 12">
         <h2>Compliance</h2>
         <p class="small">Shows entries completed (0–6), last check-in date, and whether they’ve started.</p>
-        <div id="compliance" class="tableWrap"></div>
+        <div id="compWrap" class="tableWrap"></div>
       </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="small muted">
+      Quick test: open this in a new tab:<br/>
+      <code id="pingUrl">—</code>
     </div>
   </div>
 </div>
 
 <script>
 (() => {
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0Yp5X5gBE8oYsm5HIaZOod_Tkoc9AvbfGq_rb97_h7S8X9JxHLWXJRg-_YW_K1d6l/exec";
+  /* ===========================
+     CONFIG — EDIT THESE 2 LINES
+     =========================== */
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw_fRpdtlmqe4Em68Va2dmdJK5jL-jJAvppKxQK2ojfMugiggGd7gPfscYxy6SlhfN3/exec";
   const CLASS_CODE = "STOCK6WEEK";
 
-  const $ = (id) => document.getElementById(id);
-  $("classCodeLabel").textContent = CLASS_CODE;
-
-  function fmtMoney(n){ return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD",maximumFractionDigits:2}); }
-  function escapeHtml(s){
-    return (s ?? "").toString()
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
-  function jsonp(url, timeoutMs=12000){
+  /* ===========================
+     JSONP helper (no CORS needed)
+     =========================== */
+  function jsonp(fn, params = {}){
     return new Promise((resolve) => {
-      const cbName="__cb_"+Math.random().toString(36).slice(2);
-      const script=document.createElement("script");
-      let done=false;
+      const cbName = "cb_" + Math.random().toString(36).slice(2);
+      const q = new URLSearchParams({
+        fn,
+        classCode: CLASS_CODE,
+        callback: cbName,
+        _: Date.now(),
+        ...params
+      });
 
-      window[cbName]=(payload)=>{ if(done) return; done=true; cleanup(); resolve(payload); };
-      const timer=setTimeout(()=>{ if(done) return; done=true; cleanup(); resolve({ok:false,error:"Timeout"}); }, timeoutMs);
+      let script;
+      window[cbName] = (data) => {
+        try { resolve(data); }
+        finally {
+          try { delete window[cbName]; } catch(e){}
+          try { script && script.remove(); } catch(e){}
+        }
+      };
 
-      function cleanup(){
-        clearTimeout(timer);
-        try{ delete window[cbName]; }catch(e){ window[cbName]=undefined; }
-        if(script.parentNode) script.parentNode.removeChild(script);
-      }
-
-      const joiner=url.includes("?")?"&":"?";
-      script.src=url+joiner+"callback="+encodeURIComponent(cbName)+"&_="+Date.now();
-      script.onerror=()=>{ if(done) return; done=true; cleanup(); resolve({ok:false,error:"Network/Script error"}); };
+      script = document.createElement("script");
+      script.src = `${SCRIPT_URL}?${q.toString()}`;
+      script.onerror = () => {
+        resolve({ ok:false, error:"JSONP load error (SCRIPT_URL unreachable or blocked)" });
+        try { delete window[cbName]; } catch(e){}
+        try { script.remove(); } catch(e){}
+      };
       document.body.appendChild(script);
     });
   }
 
-  async function apiGet(fn){
-    if(!SCRIPT_URL || SCRIPT_URL.includes("PASTE_YOUR")) return { ok:false, error:"SCRIPT_URL not set" };
-    const url = `${SCRIPT_URL}?fn=${encodeURIComponent(fn)}&classCode=${encodeURIComponent(CLASS_CODE)}`;
-    return await jsonp(url, 15000);
+  const $ = (id) => document.getElementById(id);
+  const fmtMoney = (n) => Number(n || 0).toLocaleString(undefined, { style:"currency", currency:"USD", maximumFractionDigits:2 });
+  const esc = (s) => (s ?? "").toString()
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+
+  $("ccLabel").textContent = CLASS_CODE;
+  const ping = `${SCRIPT_URL}?fn=ping&classCode=${encodeURIComponent(CLASS_CODE)}`;
+  $("pingUrl").textContent = ping;
+
+  function setMsg(type, text){
+    const el = $("topMsg");
+    el.className = `msg show ${type}`;
+    el.textContent = text;
+  }
+  function clearMsg(){
+    const el = $("topMsg");
+    el.className = "msg";
+    el.textContent = "";
   }
 
-  function setStatus(t){ $("status").textContent = t; }
-
   function renderLeaderboard(list){
-    const el = $("leaderboard");
-    if(!Array.isArray(list) || list.length===0){
-      el.innerHTML = `<div class="small">No data yet.</div>`;
+    const el = $("leaderWrap");
+    if(!Array.isArray(list) || list.length === 0){
+      el.innerHTML = `<div class="small" style="padding:12px">No leaderboard data yet.</div>`;
       return;
     }
     const rows = list.map((s,i)=>`
       <tr>
         <td><strong>#${i+1}</strong></td>
-        <td><strong>${escapeHtml(s.name)}</strong></td>
-        <td>${escapeHtml(s.period||"")}</td>
-        <td>${String(s.entriesCount||0)}</td>
-        <td>${escapeHtml(s.lastEntryDate||"—")}</td>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td>${esc(s.period || "")}</td>
+        <td>${String(s.entriesCount || 0)}</td>
+        <td>${esc(s.lastEntryDate || "—")}</td>
         <td><strong>${(typeof s.lastValue==="number") ? fmtMoney(s.lastValue) : "—"}</strong></td>
         <td>${(typeof s.gain==="number") ? fmtMoney(s.gain) : "—"}</td>
       </tr>
@@ -122,33 +164,35 @@
   }
 
   function renderCompliance(list){
-    const el = $("compliance");
-    if(!Array.isArray(list) || list.length===0){
-      el.innerHTML = `<div class="small">No data yet.</div>`;
+    const el = $("compWrap");
+    if(!Array.isArray(list) || list.length === 0){
+      el.innerHTML = `<div class="small" style="padding:12px">No compliance data yet.</div>`;
       return;
     }
 
-    const rows = list.map(s=>{
-      const entries = Number(s.entriesCount||0);
-      const badge = entries >= 6 ? "✅" : (entries===0 ? "⚠️" : "⏳");
-      return `
-        <tr>
-          <td>${badge}</td>
-          <td><strong>${escapeHtml(s.name)}</strong></td>
-          <td>${escapeHtml(s.period||"")}</td>
-          <td>${String(entries)}</td>
-          <td>${escapeHtml(s.lastEntryDate||"—")}</td>
-          <td class="small">${escapeHtml(s.startedAtLocal||"—")}</td>
-        </tr>
-      `;
-    }).join("");
+    // Sort by period then name (nice for teachers)
+    const sorted = [...list].sort((a,b)=>{
+      const pa = (a.period||"").toString();
+      const pb = (b.period||"").toString();
+      if(pa !== pb) return pa.localeCompare(pb, undefined, {numeric:true});
+      return (a.name||"").toString().localeCompare((b.name||"").toString());
+    });
+
+    const rows = sorted.map(s=>`
+      <tr>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td>${esc(s.period || "")}</td>
+        <td><strong>${String(s.entriesCount || 0)}</strong></td>
+        <td>${esc(s.lastEntryDate || "—")}</td>
+        <td>${esc(s.startedAtLocal || "—")}</td>
+      </tr>
+    `).join("");
 
     el.innerHTML = `
       <table>
         <thead>
           <tr>
-            <th>Status</th><th>Student</th><th>Period</th><th>Entries</th>
-            <th>Last Entry</th><th>Started</th>
+            <th>Student</th><th>Period</th><th>Entries</th><th>Last Check-In</th><th>Started</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -157,17 +201,45 @@
   }
 
   async function refresh(){
-    setStatus("Loading…");
-    const [lb, comp] = await Promise.all([apiGet("leaderboard"), apiGet("compliance")]);
+    clearMsg();
+    $("status").textContent = "Loading…";
 
-    if(!lb.ok || !comp.ok){
-      setStatus("Error. Check Apps Script deployment (Anyone) and SCRIPT_URL.");
+    // 1) Ping first (best error message)
+    const pingRes = await jsonp("ping");
+    if(!pingRes || !pingRes.ok){
+      $("status").textContent = "Error.";
+      setMsg("bad",
+        "Dashboard cannot reach the Apps Script web app. " +
+        "Fix SCRIPT_URL or the deployment access settings (Anyone / Anyone with link). " +
+        `Details: ${pingRes?.error || "no response"}`
+      );
+      $("leaderWrap").innerHTML = `<div class="small" style="padding:12px">—</div>`;
+      $("compWrap").innerHTML = `<div class="small" style="padding:12px">—</div>`;
       return;
     }
 
-    renderLeaderboard(lb.data||[]);
-    renderCompliance(comp.data||[]);
-    setStatus("Updated: " + new Date().toLocaleTimeString());
+    // 2) Load leaderboard + compliance
+    const [lb, comp] = await Promise.all([
+      jsonp("leaderboard"),
+      jsonp("compliance")
+    ]);
+
+    if(!lb?.ok){
+      setMsg("warn", `Leaderboard failed. ${lb?.error || "Unknown error"}`);
+    }
+    if(!comp?.ok){
+      setMsg("warn", `Compliance failed. ${comp?.error || "Unknown error"}`);
+    }
+
+    renderLeaderboard(lb?.ok ? (lb.data || []) : []);
+    renderCompliance(comp?.ok ? (comp.data || []) : []);
+
+    $("status").textContent = `Updated: ${new Date().toLocaleString()}`;
+
+    if(lb?.ok && comp?.ok){
+      setMsg("good", "Connected ✅ Data loaded from teacher sheet.");
+      setTimeout(clearMsg, 1600);
+    }
   }
 
   $("refreshBtn").addEventListener("click", refresh);
